@@ -1,6 +1,9 @@
 #include "Window.hpp"
 #include "OpenGL.hpp"
 
+#include <imgui.h>
+#include <imgui_impl_glfw.h>
+
 #include <stdexcept>
 #include <memory>
 #include <unordered_map>
@@ -42,6 +45,7 @@ Window::Window(const std::string& title, uint32_t width, uint32_t height) : titl
     }
 
     glfwMakeContextCurrent(window);
+    glfwSwapInterval(1);
 
     if (!gladLoadGL(glfwGetProcAddress)) {
         throw std::runtime_error("Could not load GLAD2");
@@ -167,6 +171,10 @@ Window::~Window() {
     if (glfw_users == 0) {
         glfwTerminate();
     }
+}
+
+void Window::SetupImGui() {
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
 }
 
 void Window::Update() {

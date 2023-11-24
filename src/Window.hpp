@@ -22,6 +22,8 @@ public:
 
     Window(const std::string& title, uint32_t width, uint32_t height);
     ~Window();
+
+    void SetupImGui();
     
     void Update();
     void SetShouldClose();
