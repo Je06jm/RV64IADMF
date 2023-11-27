@@ -40,6 +40,10 @@ public:
 
     void GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<float, REGISTER_COUNT>& fregisters, uint32_t& pc);
 
+    inline uint32_t GetPC() const {
+        return pc;
+    }
+
     size_t GetInstructionsPerSecond();
 };
 
