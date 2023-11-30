@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 #include <format>
+#include <fstream>
 
 Memory::Memory(uint64_t max_address) : max_address{max_address} {
     for (size_t i = 0; i < TOTAL_PAGES; i++) {
@@ -150,6 +151,7 @@ std::vector<uint32_t> Memory::Read(uint32_t address, uint32_t words) {
 }
 
 uint32_t Memory::Read32Reserved(uint32_t address, uint32_t cpu_id) {
+    lock.lock();
     for (auto& item : reservations) {
         if (item.second == (address & ~0b11)) {
             reservations.erase(item.first);
@@ -158,21 +160,67 @@ uint32_t Memory::Read32Reserved(uint32_t address, uint32_t cpu_id) {
     }
     
     reservations[cpu_id] = address & ~0b11;
+    lock.unlock();
 
     return Read32(address);
 }
 
 bool Memory::Write32Conditional(uint32_t address, uint32_t value, uint32_t cpu_id) {
+    lock.lock();
     if (reservations.find(cpu_id) == reservations.end()) {
+        lock.unlock();
         return false;
     }
 
     if (reservations[cpu_id] != (address & ~0b11)) {
+        lock.unlock();
         return false;
     }
 
     reservations.erase(cpu_id);
 
+    lock.unlock();
+
     Write32(address, value);
     return true;
+}
+
+uint32_t Memory::ReadFileInto(const std::string& path, uint32_t address) {
+    std::ifstream file(path, std::ios_base::binary | std::ios_base::ate);
+
+    if (!file.is_open()) {
+        throw std::runtime_error(std::format("Could not open {} for reading", path));
+    }
+
+    uint32_t size = file.tellg();
+    uint32_t words = size / 4;
+    if (size % 4) words++;
+    
+    file.seekg(0);
+
+    std::vector<uint32_t> data(words);
+    data[words] = 0;
+
+    file.read(reinterpret_cast<char*>(data.data()), size);
+    file.close();
+
+    Write(address, data);
+
+    return size;
+}
+
+void Memory::WriteToFile(const std::string& path, uint32_t address, uint32_t bytes) {
+    std::ofstream file(path, std::ios_base::binary);
+
+    if (!file.is_open()) {
+        throw std::runtime_error(std::format("Could not open {} for writing", path));
+    }
+
+    uint32_t words = bytes / 4;
+    if (bytes % 4) words++;
+    
+    auto data = Read(address, words);
+
+    file.write(reinterpret_cast<char*>(data.data()), bytes);
+    file.close();
 }

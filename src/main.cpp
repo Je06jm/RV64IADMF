@@ -5,6 +5,7 @@
 #include "VirtualMachine.hpp"
 
 #include "GUIMemoryViewer.hpp"
+#include "GUIAssembly.hpp"
 #include "GUIInfo.hpp"
 #include "GUIRegs.hpp"
 
@@ -12,10 +13,26 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
-int main() {
+#include <iostream>
+#include <string>
+#include <vector>
+
+int main(int argc, const char** argv) {
+    std::vector<std::string> args;
+
+    for (int i = 1; i < argc; i++) {
+        args.push_back(argv[i]);
+    }
+    
+    if (args.size() != 1) {
+        std::cout << "Usage: RV32IMF.exe <bios-file.bin>" << std::endl;
+        return 0;
+    }
+
     Window window("RV32IMF", 800, 600);
 
     Memory memory(2 * 1024 * 1024);
+    memory.ReadFileInto(args[0], 0);
     VirtualMachine vm(memory, 0, 1000000);
 
     IMGUI_CHECKVERSION();
@@ -30,7 +47,8 @@ int main() {
     window.SetupImGui();
     ImGui_ImplOpenGL3_Init();
 
-    GUIMemoryViewer mem_viewer(memory);
+    GUIMemoryViewer mem_viewer(memory, vm);
+    GUIAssembly assembly(vm, memory);
     GUIInfo info(memory, vm);
     GUIRegs state(vm);
 
@@ -44,6 +62,7 @@ int main() {
         // Do rendering
 
         mem_viewer.Draw();
+        assembly.Draw();
         info.Draw();
         state.Draw();
 

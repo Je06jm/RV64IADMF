@@ -2,7 +2,7 @@
 
 #include <format>
 
-VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t instructions_per_second) : memory{memory}, pc{starting_pc}, instructions_per_second{instructions_per_second} {
+VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t instructions_per_second, uint32_t hart_id) : memory{memory}, pc{starting_pc}, instructions_per_second{instructions_per_second} {
     for (auto& r : regs) {
         r = 0;
     }
@@ -10,6 +10,21 @@ VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t inst
     for (auto& f : fregs) {
         f = 0.0;
     }
+
+    for (auto& csr : csrs) {
+        csr = 0;
+    }
+
+    //csrs
+    // XXXXXXXX
+    // vmachine
+    csrs[CSR_MVENDORID] = 0;
+    csrs[CSR_MARCHID] = ('V' << 24) | ('M' << 16) | ('A' << 8) | ('C');
+    csrs[CSR_MIMPID] = ('H' << 24) | ('I' << 16) | ('N' << 8) | ('E');
+
+    csrs[CSR_MHARTID] = hart_id;
+
+    csrs[CSR_MISA] = ISA_32_BITS | ISA_A | ISA_F | ISA_I | ISA_M | ISA_S | ISA_U;
 }
 
 VirtualMachine::~VirtualMachine() {

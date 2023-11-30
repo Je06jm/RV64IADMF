@@ -59,6 +59,9 @@ public:
     uint32_t Read32Reserved(uint32_t address, uint32_t cpu_id);
     bool Write32Conditional(uint32_t address, uint32_t value, uint32_t cpu_id);
 
+    uint32_t ReadFileInto(const std::string& path, uint32_t address);
+    void WriteToFile(const std::string& path, uint32_t address, uint32_t bytes);
+
     inline size_t GetTotalMemory() {
         return max_address;
     }

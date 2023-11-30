@@ -2,10 +2,15 @@
 #define MEMORY_EDITOR_HPP
 
 #include "Memory.hpp"
+#include "VirtualMachine.hpp"
+
+#include "GUIConstants.hpp"
+
 #include <string>
 
 class GUIMemoryViewer {
     Memory& memory;
+    VirtualMachine& vm;
 
     struct Style {
         float glyph_width;
@@ -31,7 +36,7 @@ class GUIMemoryViewer {
     std::string text_input_buffer = "0";
 
 public:
-    GUIMemoryViewer(Memory& memory);
+    GUIMemoryViewer(Memory& memory, VirtualMachine& vm);
     ~GUIMemoryViewer() = default;
 
     void Draw();

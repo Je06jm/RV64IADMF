@@ -48,15 +48,50 @@ void GUIRegs::Draw() {
             "t6"
         };
 
+        std::array<std::string, VirtualMachine::REGISTER_COUNT> fnames = {
+            "ft0",
+            "ft1",
+            "ft2",
+            "ft3",
+            "ft4",
+            "ft5",
+            "ft6",
+            "ft7",
+            "fs0",
+            "fs1",
+            "fa0",
+            "fa1",
+            "fa2",
+            "fa3",
+            "fa4",
+            "fa5",
+            "fa6",
+            "fa7",
+            "fs2",
+            "fs3",
+            "fs4",
+            "fs5",
+            "fs6",
+            "fs7",
+            "fs8",
+            "fs9",
+            "fs10",
+            "fs11",
+            "ft8",
+            "ft9",
+            "ft10",
+            "ft11"
+        };
+
         for (size_t i = 0; i < VirtualMachine::REGISTER_COUNT; i++) {
-            ImGui::Text("%-10sr%-2u : 0x%08x (%i)", names[i].c_str(), static_cast<uint32_t>(i), regs[i], regs[i]);
+            ImGui::Text("%-10sx%-2u : 0x%08x (%i)", names[i].c_str(), static_cast<uint32_t>(i), regs[i], regs[i]);
         }
 
         ImGui::Text(" ");
 
         for (size_t i = 0; i < VirtualMachine::REGISTER_COUNT; i++) {
 
-            ImGui::Text("          f%-2u : 0x%08x (%.8g)", static_cast<uint32_t>(i), *reinterpret_cast<uint32_t*>(&fregs[i]), fregs[i]);
+            ImGui::Text("%-10sf%-2u : 0x%08x (%.8g)", fnames[i].c_str(), static_cast<uint32_t>(i), *reinterpret_cast<uint32_t*>(&fregs[i]), fregs[i]);
         }
     }
 

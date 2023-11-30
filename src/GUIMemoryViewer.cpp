@@ -53,7 +53,7 @@ void GUIMemoryViewer::UpdateBuffer() {
     data_buffer = memory.Read(read_address, (end_address - read_address) / sizeof(uint32_t));
 }
 
-GUIMemoryViewer::GUIMemoryViewer(Memory& memory) : memory{memory} {
+GUIMemoryViewer::GUIMemoryViewer(Memory& memory, VirtualMachine& vm) : memory{memory}, vm{vm} {
     UpdateBuffer();
 }
 
@@ -120,7 +120,12 @@ void GUIMemoryViewer::Draw() {
                     } else {
                         uint32_t value = data_buffer[byte_index >> 2];
                         uint8_t byte = value >> (8 * (byte_index & 0b11));
-                        ImGui::Text("%02x", byte);
+
+                        if (addr + c == vm.GetPC()) {
+                            ImGui::TextColored(gui_highlight_color, "%02x", byte);
+                        } else {
+                            ImGui::Text("%02x", byte);
+                        }
 
                         ImGui::SameLine(ascii_pos_x);
                         if (byte >= 32 && byte < 127) {
