@@ -5,12 +5,15 @@
 
 #include <cstdint>
 #include <array>
+#include <vector>
 #include <thread>
 #include <mutex>
 #include <memory>
 #include <string>
 
 class VirtualMachine {
+    friend class TLBEntry;
+
 public:
     static constexpr size_t REGISTER_COUNT = 32;
     static constexpr size_t CSR_COUNT = 4096;
@@ -100,6 +103,67 @@ private:
     std::array<float, REGISTER_COUNT> fregs;
     std::array<uint32_t, CSR_COUNT> csrs;
 
+    static constexpr size_t TLB_CACHE_SIZE = 16;
+
+public:
+    class TLBEntry {
+        VirtualMachine& vm;
+        uint32_t physical_address;
+        uint32_t table;
+        uint32_t table_entry;
+
+    public:
+        TLBEntry(VirtualMachine& vm, uint32_t physical_address, uint32_t table, uint32_t table_entry) : vm{vm}, physical_address{physical_address}, table{table}, table_entry{table_entry} {}
+
+        inline TLBEntry& operator=(const TLBEntry& other) {
+            physical_address = other.physical_address;
+            table = other.table;
+            table_entry = other.table_entry;
+            return *this;
+        }
+
+        static constexpr uint32_t FLAG_VALID = (1<<0);
+        static constexpr uint32_t FLAG_READ = (1<<1);
+        static constexpr uint32_t FLAG_WRITE = (1<<2);
+        static constexpr uint32_t FLAG_EXECUTE = (1<<3);
+        static constexpr uint32_t FLAG_USER = (1<<4);
+        static constexpr uint32_t FLAG_GLOBAL = (1<<5);
+        static constexpr uint32_t FLAG_ACCESSED = (1<<6);
+        static constexpr uint32_t FLAG_DIRTY = (1<<7);
+        
+        static constexpr uint32_t PAGE_MASK = 0xfff;
+        static constexpr uint32_t MEGA_PAGE_MASK = 0x3fffff;
+
+        inline bool IsVirtual() const {
+            return (table == -1ULL);
+        }
+
+        inline bool IsMegaPage() const {
+            return IsFlagsSet(FLAG_READ | FLAG_WRITE | FLAG_EXECUTE);
+        }
+        
+        bool IsFlagsSet(uint32_t flags) const;
+        void SetFlags(uint32_t flags);
+        void ClearFlgs(uint32_t flags);
+        
+        bool IsInPage(uint32_t phys_address) const;
+        
+        uint32_t TranslateAddress(uint32_t phys_address) const;
+
+        bool CheckValid();
+        bool CheckExecution(bool as_user);
+        bool CheckRead(bool as_user);
+        bool CheckWrite(bool as_user);
+
+        inline static TLBEntry CreateNonVirtual(VirtualMachine& vm) {
+            return {vm, -1ULL, -1ULL, -1ULL};
+        }
+    };
+    
+private:
+
+    std::vector<TLBEntry> tlb_cache;
+
     Memory& memory;
 
     uint32_t pc;
@@ -126,7 +190,7 @@ public:
         return pc;
     }
 
-    uint32_t GetTLBLookup(uint32_t phys_addr, uint32_t& page_table, uint32_t& page_table_entry);
+    TLBEntry GetTLBLookup(uint32_t phys_addr, bool bypass_cache = false);
 
     size_t GetInstructionsPerSecond();
 };

@@ -1,5 +1,6 @@
 {
   "files.associations": {
+    "*.z80": "gbz80",
     "*.txt": "plaintext",
     "*.html": "html",
     "*.S": "nasm",
@@ -70,7 +71,22 @@
     "xlocmon": "cpp",
     "xlocnum": "cpp",
     "xloctime": "cpp",
-    "xtree": "cpp"
+    "xtree": "cpp",
+    "*.tcc": "cpp",
+    "condition_variable": "cpp",
+    "cstdarg": "cpp",
+    "cwctype": "cpp",
+    "deque": "cpp",
+    "memory_resource": "cpp",
+    "numeric": "cpp",
+    "random": "cpp",
+    "string_view": "cpp",
+    "numbers": "cpp",
+    "semaphore": "cpp",
+    "span": "cpp",
+    "cinttypes": "cpp",
+    "variant": "cpp",
+    "fstream": "cpp"
   },
   "C_Cpp_Runner.cCompilerPath": "gcc",
   "C_Cpp_Runner.cppCompilerPath": "g++",

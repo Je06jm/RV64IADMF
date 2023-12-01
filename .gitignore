@@ -33,3 +33,6 @@
 
 # Misc
 .vscode
+*.bin
+*.elf
+*.rv_o

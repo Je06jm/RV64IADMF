@@ -29,9 +29,9 @@ private:
     };
     std::vector<MemoryAccessCallback> memory_access_callbacks;
 
-    std::unordered_map<uint32_t, uint32_t> reservations;
+    mutable std::unordered_map<uint32_t, uint32_t> reservations;
 
-    std::mutex lock;
+    mutable std::mutex lock;
 
 public:
     const uint64_t max_address;
@@ -45,16 +45,16 @@ public:
     Memory& operator=(const Memory&) = delete;
     Memory& operator=(Memory&&) = delete;
 
-    uint32_t Read32(uint32_t address);
-    uint16_t Read16(uint32_t address);
-    uint8_t Read8(uint32_t address);
+    uint32_t Read32(uint32_t address) const;
+    uint16_t Read16(uint32_t address) const;
+    uint8_t Read8(uint32_t address) const;
 
     void Write32(uint32_t address, uint32_t value);
     void Write16(uint32_t address, uint16_t value);
     void Write8(uint32_t address, uint8_t value);
 
     void Write(uint32_t address, std::vector<uint32_t> data);
-    std::vector<uint32_t> Read(uint32_t address, uint32_t words);
+    std::vector<uint32_t> Read(uint32_t address, uint32_t words) const;
 
     uint32_t Read32Reserved(uint32_t address, uint32_t cpu_id);
     bool Write32Conditional(uint32_t address, uint32_t value, uint32_t cpu_id);

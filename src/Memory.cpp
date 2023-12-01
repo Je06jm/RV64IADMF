@@ -21,7 +21,7 @@ void Memory::EnsureMemoryIsLoadedIn(uint32_t address) {
     lock.unlock();
 }
 
-uint32_t Memory::Read32(uint32_t address) {
+uint32_t Memory::Read32(uint32_t address) const {
     if (address >= max_address) {
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
     }
@@ -47,7 +47,7 @@ uint32_t Memory::Read32(uint32_t address) {
     return data;
 }
 
-uint16_t Memory::Read16(uint32_t address) {
+uint16_t Memory::Read16(uint32_t address) const {
     if (address >= max_address) {
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
     }
@@ -62,7 +62,7 @@ uint16_t Memory::Read16(uint32_t address) {
     return data;
 }
 
-uint8_t Memory::Read8(uint32_t address) {
+uint8_t Memory::Read8(uint32_t address) const {
     if (address >= max_address) {
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
     }
@@ -140,7 +140,7 @@ void Memory::Write(uint32_t address, std::vector<uint32_t> data) {
     }
 }
 
-std::vector<uint32_t> Memory::Read(uint32_t address, uint32_t words) {
+std::vector<uint32_t> Memory::Read(uint32_t address, uint32_t words) const {
     std::vector<uint32_t> data;
     for (uint32_t head = address, i = 0; i < words; i++) {
         data.push_back(Read32(head));

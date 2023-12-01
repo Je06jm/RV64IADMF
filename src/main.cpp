@@ -33,7 +33,7 @@ int main(int argc, const char** argv) {
 
     Memory memory(2 * 1024 * 1024);
     memory.ReadFileInto(args[0], 0);
-    VirtualMachine vm(memory, 0, 1000000);
+    VirtualMachine vm(memory, 0, 1000000, 0);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
