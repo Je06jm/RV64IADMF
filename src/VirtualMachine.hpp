@@ -135,7 +135,7 @@ public:
         static constexpr uint32_t MEGA_PAGE_MASK = 0x3fffff;
 
         inline bool IsVirtual() const {
-            return (table == -1ULL);
+            return (table == -1U);
         }
 
         inline bool IsMegaPage() const {
@@ -156,7 +156,7 @@ public:
         bool CheckWrite(bool as_user);
 
         inline static TLBEntry CreateNonVirtual(VirtualMachine& vm) {
-            return {vm, -1ULL, -1ULL, -1ULL};
+            return {vm, -1U, -1U, -1U};
         }
     };
     
