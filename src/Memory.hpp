@@ -45,16 +45,16 @@ public:
     Memory& operator=(const Memory&) = delete;
     Memory& operator=(Memory&&) = delete;
 
-    uint32_t Read32(uint32_t address) const;
-    uint16_t Read16(uint32_t address) const;
-    uint8_t Read8(uint32_t address) const;
+    uint32_t Read32(uint32_t address);
+    uint16_t Read16(uint32_t address);
+    uint8_t Read8(uint32_t address);
 
     void Write32(uint32_t address, uint32_t value);
     void Write16(uint32_t address, uint16_t value);
     void Write8(uint32_t address, uint8_t value);
 
     void Write(uint32_t address, std::vector<uint32_t> data);
-    std::vector<uint32_t> Read(uint32_t address, uint32_t words) const;
+    std::vector<uint32_t> Read(uint32_t address, uint32_t words);
 
     uint32_t Read32Reserved(uint32_t address, uint32_t cpu_id);
     bool Write32Conditional(uint32_t address, uint32_t value, uint32_t cpu_id);
