@@ -163,7 +163,7 @@ RVInstruction::operator std::string() {
 
     switch (opcode) {
         case OP_LUI:
-            s = std::format("LUI {}, {}", register_names[rd], immediate);
+            s = std::format("LUI {}, {}", register_names[rd], immediate >> 12);
             break;
         
         case OP_AUIPC:
