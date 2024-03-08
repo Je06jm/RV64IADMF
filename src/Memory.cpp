@@ -133,7 +133,7 @@ void Memory::Write8(uint32_t address, uint8_t data) {
     Write32(address & ~0b11, existing_data);
 }
 
-void Memory::Write(uint32_t address, std::vector<uint32_t> data) {
+void Memory::Write(uint32_t address, const std::vector<uint32_t>& data) {
     for (uint32_t head = address, i = 0; i < data.size(); i++) {
         Write32(head, data[i]);
         head += 4;
@@ -199,7 +199,7 @@ uint32_t Memory::ReadFileInto(const std::string& path, uint32_t address) {
     file.seekg(0);
 
     std::vector<uint32_t> data(words);
-    data[words] = 0;
+    data[words - 1] = 0;
 
     file.read(reinterpret_cast<char*>(data.data()), size);
     file.close();

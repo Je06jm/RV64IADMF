@@ -53,7 +53,7 @@ public:
     void Write16(uint32_t address, uint16_t value);
     void Write8(uint32_t address, uint8_t value);
 
-    void Write(uint32_t address, std::vector<uint32_t> data);
+    void Write(uint32_t address, const std::vector<uint32_t>& data);
     std::vector<uint32_t> Read(uint32_t address, uint32_t words);
 
     uint32_t Read32Reserved(uint32_t address, uint32_t cpu_id);
