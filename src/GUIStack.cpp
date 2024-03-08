@@ -1,4 +1,4 @@
-#include "GUIAssembly.hpp"
+#include "GUIStack.hpp"
 
 #include "GUIConstants.hpp"
 
@@ -7,14 +7,11 @@
 #include <stdexcept>
 #include <format>
 
-void GUIAssembly::Draw() {
-    if (ImGui::Begin("Assembly")) {
-        uint32_t pc = vm.GetPC();
+void GUIStack::Draw() {
+    if (ImGui::Begin("Stack")) {
+        uint32_t sp = vm.GetSP();
 
-        int64_t window_begin = (pc >> 2) - WINDOW / 2 + WINDOW_SLIDE;
-
-        if (window_begin < 0) window_begin = 0;
-
+        int64_t window_begin = sp >> 2;
         int64_t window_end = window_begin + WINDOW;
         int64_t window_end_pc = window_end << 2;
 
@@ -30,14 +27,13 @@ void GUIAssembly::Draw() {
 
         uint32_t window_pc = static_cast<uint32_t>(window_begin) << 2;
 
-        auto instrs = memory.Read(window_pc, WINDOW);
+        auto values = memory.Read(window_pc, WINDOW);
 
         for (uint32_t addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
-            RVInstruction instr = RVInstruction::FromUInt32(instrs[i]);
-            if (addr == pc) {
-                ImGui::TextColored(gui_pc_highlight_color, "-> 0x%08x %s", addr, std::string(instr).c_str());
+            if (addr == sp) {
+                ImGui::TextColored(gui_sp_highlight_color, "-> 0x%08x : 0x%08x (%i)", addr, values[i], values[i]);
             } else {
-                ImGui::Text("   0x%08x %s", addr, std::string(instr).c_str());
+                ImGui::Text("   0x%08x : 0x%08x (%i)", addr, values[i], values[i]);
             }
         }
     }

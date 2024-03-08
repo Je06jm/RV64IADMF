@@ -190,6 +190,10 @@ public:
         return pc;
     }
 
+    inline uint32_t GetSP() const {
+        return regs[2];
+    }
+
     TLBEntry GetTLBLookup(uint32_t phys_addr, bool bypass_cache = false);
 
     size_t GetInstructionsPerSecond();
