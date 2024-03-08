@@ -3,11 +3,13 @@
 
 #include "Memory.hpp"
 #include "VirtualMachine.hpp"
+#include "RV32I.hpp"
 
 #include "GUIMemoryViewer.hpp"
 #include "GUIAssembly.hpp"
 #include "GUIInfo.hpp"
 #include "GUIRegs.hpp"
+#include "GUIStack.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -28,6 +30,8 @@ int main(int argc, const char** argv) {
         std::cout << "Usage: RV32IMF.exe <bios-file.bin>" << std::endl;
         return 0;
     }
+
+    RVInstruction::SetupCSRNames();
 
     Window window("RV32IMF", 800, 600);
 
@@ -51,6 +55,7 @@ int main(int argc, const char** argv) {
     GUIAssembly assembly(vm, memory);
     GUIInfo info(memory, vm);
     GUIRegs state(vm);
+    GUIStack stack(vm, memory);
 
     while (!window.ShouldClose()) {
         window.Update();
@@ -65,6 +70,7 @@ int main(int argc, const char** argv) {
         assembly.Draw();
         info.Draw();
         state.Draw();
+        stack.Draw();
 
         if (vm.IsRunning()) vm.Step(0);
 
