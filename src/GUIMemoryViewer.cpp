@@ -122,7 +122,9 @@ void GUIMemoryViewer::Draw() {
                         uint8_t byte = value >> (8 * (byte_index & 0b11));
 
                         if (addr + c == vm.GetPC()) {
-                            ImGui::TextColored(gui_highlight_color, "%02x", byte);
+                            ImGui::TextColored(gui_pc_highlight_color, "%02x", byte);
+                        } else if (addr + c == vm.GetSP()) {
+                            ImGui::TextColored(gui_sp_highlight_color, "%02x", byte);
                         } else {
                             ImGui::Text("%02x", byte);
                         }

@@ -1,5 +1,7 @@
 #include "GUIRegs.hpp"
 
+#include "GUIConstants.hpp"
+
 #include <imgui.h>
 
 void GUIRegs::Draw() {
@@ -10,7 +12,8 @@ void GUIRegs::Draw() {
 
         vm.GetSnapshot(regs, fregs, pc);
 
-        ImGui::Text("          pc  : 0x%08x", pc);
+        ImGui::TextColored(gui_pc_highlight_color, "          pc  : 0x%08x", pc);
+        ImGui::TextColored(gui_sp_highlight_color, "          sp  : 0x%08x", regs[2]);
         ImGui::Text(" ");
 
         std::array<std::string, VirtualMachine::REGISTER_COUNT> names = {
