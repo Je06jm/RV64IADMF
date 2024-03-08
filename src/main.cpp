@@ -66,6 +66,8 @@ int main(int argc, const char** argv) {
         info.Draw();
         state.Draw();
 
+        if (vm.IsRunning()) vm.Step(0);
+
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
