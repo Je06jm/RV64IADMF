@@ -167,10 +167,8 @@ void GUIMemoryViewer::Draw() {
             aligned_address = aligned_address < memory.max_address ? aligned_address : (memory.max_address - COLUMNS);
             aligned_address &= ~0xf;
 
-            if (aligned_address != read_address) {
-                read_address = aligned_address;
-                UpdateBuffer();
-            }
+            read_address = aligned_address;
+            UpdateBuffer();
             
             char buffer[16];
             sprintf(buffer, "%x", aligned_address);
