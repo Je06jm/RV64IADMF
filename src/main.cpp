@@ -1,5 +1,6 @@
 #include "Window.hpp"
 #include "OpenGL.hpp"
+#include "DeltaTime.hpp"
 
 #include "Memory.hpp"
 #include "VirtualMachine.hpp"
@@ -58,9 +59,11 @@ int main(int argc, const char** argv) {
     GUIStack stack(vm, memory);
 
     vm.Start();
+    delta_time.Update();
 
     while (!window.ShouldClose()) {
         window.Update();
+        delta_time.Update();
 
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
