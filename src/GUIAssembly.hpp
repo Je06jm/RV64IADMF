@@ -9,7 +9,7 @@ class GUIAssembly {
     VirtualMachine& vm;
     Memory& memory;
 
-    static constexpr size_t WINDOW = 32;
+    static constexpr size_t WINDOW = 128;
     static constexpr size_t WINDOW_SLIDE = 12;
 
 public:

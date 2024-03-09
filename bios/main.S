@@ -9,7 +9,9 @@ _start:
     add t3, t0, t1
     
     la t0, hello
-    ecall
+    // ecall
+
+    li sp, 0x4000
 
 .loop:
     j .loop

@@ -57,6 +57,8 @@ int main(int argc, const char** argv) {
     GUIRegs state(vm);
     GUIStack stack(vm, memory);
 
+    vm.Start();
+
     while (!window.ShouldClose()) {
         window.Update();
 
@@ -72,7 +74,8 @@ int main(int argc, const char** argv) {
         state.Draw();
         stack.Draw();
 
-        if (vm.IsRunning()) vm.Step(0);
+        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false))
+            if (vm.IsRunning()) vm.Step(1);
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
