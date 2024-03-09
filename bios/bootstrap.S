@@ -6,7 +6,7 @@
 .extern printf
 
 _start:
-    li sp, 0x4000
+    la sp, stack_top
     jal ra, bios_main
 
     li a0, 0
@@ -26,3 +26,10 @@ machine_call:
 
 .data
 ret_error: .string "bios_main has returned\n"
+
+.bss
+
+.align 16
+stack_bottom:
+.space 1024 * 16
+stack_top:
