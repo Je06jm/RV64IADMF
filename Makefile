@@ -18,7 +18,7 @@ CXX_HEADERS = $(wildcard src/*.hpp)
 PROGRAM = RV32IMF
 
 BIOS_LD = ld.lld
-BIOS_LD_FLAGS = -Ttext=0x0 -Tdata=0x10000 -Tbss=0x20000
+BIOS_LD_FLAGS = -T bios/linker.ld
 
 BIOS_OBJ_COPY = llvm-objcopy
 BIOS_OBJ_COPY_FLAGS = -O binary
