@@ -69,7 +69,7 @@ uint8_t Memory::Read8(uint32_t address) {
 
     auto data = Read32(address & ~0b11);
 
-    return data >> (8 & (address & 0b11));
+    return data >> (8 * (address & 0b11));
 }
 
 void Memory::Write32(uint32_t address, uint32_t data) {
