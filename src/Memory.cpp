@@ -4,6 +4,11 @@
 #include <format>
 #include <fstream>
 
+union U32S32 {
+    uint32_t u;
+    int32_t s;
+};
+
 Memory::Memory(uint64_t max_address) : max_address{max_address} {
     for (size_t i = 0; i < TOTAL_PAGES; i++) {
         pages.push_back(nullptr);
@@ -131,6 +136,158 @@ void Memory::Write8(uint32_t address, uint8_t data) {
     existing_data |= data << (8 * (address & 0b11));
 
     Write32(address & ~0b11, existing_data);
+}
+
+uint32_t Memory::AtomicSwap(uint32_t address, uint32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    (*pages[page])[index] = value;
+    lock.unlock();
+
+    return data;
+}
+
+uint32_t Memory::AtomicAdd(uint32_t address, uint32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    (*pages[page])[index] = data + value;
+    lock.unlock();
+
+    return data;
+}
+
+uint32_t Memory::AtomicAnd(uint32_t address, uint32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    (*pages[page])[index] = data & value;
+    lock.unlock();
+
+    return data;
+}
+
+uint32_t Memory::AtomicOr(uint32_t address, uint32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    (*pages[page])[index] = data | value;
+    lock.unlock();
+
+    return data;
+}
+
+uint32_t Memory::AtomicXor(uint32_t address, uint32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    (*pages[page])[index] = data ^ value;
+    lock.unlock();
+
+    return data;
+}
+
+int32_t Memory::AtomicMin(uint32_t address, int32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    U32S32 v;
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    v.u = data;
+    if (value < v.s) v.s = value;
+    (*pages[page])[index] = v.u;
+    lock.unlock();
+
+    return data;
+}
+
+uint32_t Memory::AtomicMinU(uint32_t address, uint32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    if (value < data) (*pages[page])[index] = value;
+    lock.unlock();
+
+    return data;
+}
+
+int32_t Memory::AtomicMax(uint32_t address, int32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    U32S32 v;
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    v.u = data;
+    if (value > v.s) v.s = value;
+    (*pages[page])[index] = v.u;
+    lock.unlock();
+
+    return data;
+}
+
+uint32_t Memory::AtomicMaxU(uint32_t address, uint32_t value) {
+    if (address >= max_address) {
+        throw std::runtime_error(std::format("Tried to perform an atomic memory operation past max_address"));
+    }
+
+    auto page = address / PAGE_SIZE;
+    auto index = (address % PAGE_SIZE) / sizeof(uint32_t);
+
+    lock.lock();
+    auto data = (*pages[page])[index];
+    if (value > data) (*pages[page])[index] = value;
+    lock.unlock();
+
+    return data;
 }
 
 void Memory::Write(uint32_t address, const std::vector<uint32_t>& data) {

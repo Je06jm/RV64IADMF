@@ -647,6 +647,67 @@ bool VirtualMachine::Step(uint32_t steps) {
                 
                 break;
 
+            case RVInstruction::OP_ATOMIC:
+                if (instr.func3 != RVInstruction::FUNC3_ATOMIC) InvalidInstruction();
+
+                switch (instr.func7 & RVInstruction::FUNC7_ATOMIC_MASK) {
+                    case RVInstruction::FUNC7_LR_W:
+                        if (instr.rs2 != 0) InvalidInstruction();
+                        regs[instr.rd] = memory.Read32Reserved(regs[instr.rs1], csrs[CSR_MHARTID]);
+                        break;
+                    
+                    case RVInstruction::FUNC7_SC_W:
+                        if (memory.Write32Conditional(regs[instr.rs1], regs[instr.rs2], csrs[CSR_MHARTID])) {
+                            regs[instr.rd] = 0;
+                        } else {
+                            regs[instr.rd] = 1;
+                        }
+                        break;
+                    
+                    case RVInstruction::FUNC7_AMOSWAP_W:
+                        regs[instr.rd] = memory.AtomicSwap(regs[instr.rs1], regs[instr.rs2]);
+                        break;
+                    
+                    case RVInstruction::FUNC7_AMOADD_W:
+                        regs[instr.rd] = memory.AtomicAdd(regs[instr.rs1], regs[instr.rs2]);
+                        break;
+                    
+                    case RVInstruction::FUNC7_AMOAND_W:
+                        regs[instr.rd] = memory.AtomicAnd(regs[instr.rs1], regs[instr.rs2]);
+                        break;
+                    
+                    case RVInstruction::FUNC7_AMOOR_W:
+                        regs[instr.rd] = memory.AtomicOr(regs[instr.rs1], regs[instr.rs2]);
+                        break;
+                    
+                    case RVInstruction::FUNC7_AMOMAX_W: {
+                        int32_t result = AsSigned(regs[instr.rs2]);
+                        result = memory.AtomicMax(regs[instr.rs1], result);
+                        regs[instr.rd] = AsUnsigned(result);
+                        break;
+                    }
+                    
+                    case RVInstruction::FUNC7_AMOMAXU_W:
+                        regs[instr.rd] = memory.AtomicMaxU(regs[instr.rs1], regs[instr.rs2]);
+                        break;
+                    
+                    case RVInstruction::FUNC7_AMOMIN_W: {
+                        int32_t result = AsSigned(regs[instr.rs2]);
+                        result = memory.AtomicMin(regs[instr.rs1], result);
+                        regs[instr.rd] = AsUnsigned(result);
+                        break;
+                    }
+                    
+                    case RVInstruction::FUNC7_AMOMINU_W:
+                        regs[instr.rd] = memory.AtomicMinU(regs[instr.rs1], regs[instr.rs2]);
+                        break;
+                    
+                    default:
+                        InvalidInstruction();
+                        break;
+                }
+                break;
+
             default:
                 InvalidInstruction();
                 break;

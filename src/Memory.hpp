@@ -53,6 +53,16 @@ public:
     void Write16(uint32_t address, uint16_t value);
     void Write8(uint32_t address, uint8_t value);
 
+    uint32_t AtomicSwap(uint32_t address, uint32_t value);
+    uint32_t AtomicAdd(uint32_t address, uint32_t value);
+    uint32_t AtomicAnd(uint32_t address, uint32_t value);
+    uint32_t AtomicOr(uint32_t address, uint32_t value);
+    uint32_t AtomicXor(uint32_t address, uint32_t value);
+    int32_t AtomicMin(uint32_t address, int32_t value);
+    uint32_t AtomicMinU(uint32_t address, uint32_t value);
+    int32_t AtomicMax(uint32_t address, int32_t value);
+    uint32_t AtomicMaxU(uint32_t address, uint32_t value);
+
     void Write(uint32_t address, const std::vector<uint32_t>& data);
     std::vector<uint32_t> Read(uint32_t address, uint32_t words);
 
