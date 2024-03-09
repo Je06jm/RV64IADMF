@@ -107,6 +107,73 @@ private:
     static constexpr size_t TLB_CACHE_SIZE = 16;
 
 public:
+    static constexpr size_t REG_ZERO = 0;
+    static constexpr size_t REG_RA = 1;
+    static constexpr size_t REG_SP = 2;
+    static constexpr size_t REG_GP = 3;
+    static constexpr size_t REG_TP = 4;
+    static constexpr size_t REG_T0 = 5;
+    static constexpr size_t REG_T1 = 6;
+    static constexpr size_t REG_T2 = 7;
+    static constexpr size_t REG_S0 = 8;
+    static constexpr size_t REG_FP = 8;
+    static constexpr size_t REG_S1 = 9;
+    static constexpr size_t REG_A0 = 10;
+    static constexpr size_t REG_A1 = 11;
+    static constexpr size_t REG_A2 = 12;
+    static constexpr size_t REG_A3 = 13;
+    static constexpr size_t REG_A4 = 14;
+    static constexpr size_t REG_A5 = 15;
+    static constexpr size_t REG_A6 = 16;
+    static constexpr size_t REG_A7 = 17;
+    static constexpr size_t REG_S2 = 18;
+    static constexpr size_t REG_S3 = 19;
+    static constexpr size_t REG_S4 = 20;
+    static constexpr size_t REG_S5 = 21;
+    static constexpr size_t REG_S6 = 22;
+    static constexpr size_t REG_S7 = 23;
+    static constexpr size_t REG_S8 = 24;
+    static constexpr size_t REG_S9 = 25;
+    static constexpr size_t REG_S10 = 26;
+    static constexpr size_t REG_S11 = 27;
+    static constexpr size_t REG_T3 = 28;
+    static constexpr size_t REG_T4 = 29;
+    static constexpr size_t REG_T5 = 30;
+    static constexpr size_t REG_T6 = 31;
+
+    static constexpr size_t REG_FT0 = 0;
+    static constexpr size_t REG_FT1 = 1;
+    static constexpr size_t REG_FT2 = 2;
+    static constexpr size_t REG_FT3 = 3;
+    static constexpr size_t REG_FT4 = 4;
+    static constexpr size_t REG_FT5 = 5;
+    static constexpr size_t REG_FT6 = 6;
+    static constexpr size_t REG_FT7 = 7;
+    static constexpr size_t REG_FS0 = 8;
+    static constexpr size_t REG_FS1 = 9;
+    static constexpr size_t REG_FA0 = 10;
+    static constexpr size_t REG_FA1 = 11;
+    static constexpr size_t REG_FA2 = 12;
+    static constexpr size_t REG_FA3 = 13;
+    static constexpr size_t REG_FA4 = 14;
+    static constexpr size_t REG_FA5 = 15;
+    static constexpr size_t REG_FA6 = 16;
+    static constexpr size_t REG_FA7 = 17;
+    static constexpr size_t REG_FS2 = 18;
+    static constexpr size_t REG_FS3 = 19;
+    static constexpr size_t REG_FS4 = 20;
+    static constexpr size_t REG_FS5 = 21;
+    static constexpr size_t REG_FS6 = 22;
+    static constexpr size_t REG_FS7 = 23;
+    static constexpr size_t REG_FS8 = 24;
+    static constexpr size_t REG_FS9 = 25;
+    static constexpr size_t REG_FS10 = 26;
+    static constexpr size_t REG_FS11 = 27;
+    static constexpr size_t REG_FT8 = 28;
+    static constexpr size_t REG_FT9 = 29;
+    static constexpr size_t REG_FT10 = 30;
+    static constexpr size_t REG_FT11 = 31;
+
     class TLBEntry {
         VirtualMachine& vm;
         uint32_t physical_address;
@@ -212,6 +279,20 @@ public:
 
     inline bool IsBreakPoint(uint32_t addr) {
         return break_points.contains(addr);
+    }
+
+
+    using ECallHandler = std::function<void(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<float, REGISTER_COUNT>& fregs)>;
+
+private:
+    static void EmptyECallHandler(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<float, REGISTER_COUNT>&);
+
+    static std::vector<ECallHandler> ecall_handlers;
+
+public:
+    inline static void RegisterECall(uint32_t handler_index, ECallHandler handler) {
+        if (handler_index >= ecall_handlers.size()) ecall_handlers.resize(handler_index + 1, EmptyECallHandler);
+        ecall_handlers[handler_index] = handler;
     }
 };
 

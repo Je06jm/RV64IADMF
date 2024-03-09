@@ -5,6 +5,7 @@
 #include "Memory.hpp"
 #include "VirtualMachine.hpp"
 #include "RV32I.hpp"
+#include "EBreaks.hpp"
 
 #include "GUIMemoryViewer.hpp"
 #include "GUIAssembly.hpp"
@@ -33,6 +34,7 @@ int main(int argc, const char** argv) {
     }
 
     RVInstruction::SetupCSRNames();
+    RegisterBuiltinEBreaks();
 
     Window window("RV32IMF", 800, 600);
 
@@ -61,6 +63,10 @@ int main(int argc, const char** argv) {
     vm.Start();
     delta_time.Update();
 
+    vm.SetBreakPoint(0x10);
+
+    bool auto_run = false;
+
     while (!window.ShouldClose()) {
         window.Update();
         delta_time.Update();
@@ -77,9 +83,16 @@ int main(int argc, const char** argv) {
         state.Draw();
         stack.Draw();
 
-        if (ImGui::IsKeyPressed(ImGuiKey_Enter, false))
-            if (vm.IsRunning()) vm.Step(1);
+        if (ImGui::IsKeyPressed(ImGuiKey_Space, false))
+            auto_run = !auto_run;
 
+        if (auto_run)
+            vm.Step();
+        else
+            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false))
+                if (vm.Step(1))
+                    std::cout << "Breakpoint" << std::endl;
+        
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 

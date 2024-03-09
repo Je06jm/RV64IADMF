@@ -628,10 +628,14 @@ bool VirtualMachine::Step(uint32_t steps) {
                 else if ((instr.func7 == RVInstruction::FUNC7_SFENCE_VMA) && (instr.rs2 == RVInstruction::RS2_SFENCE_INVAL_IR) && (instr.rs1 == RVInstruction::RS1_SYSTEM) && (instr.rd == RVInstruction::RD_SYSTEM))
                     throw std::runtime_error("SFENCE.INVAL.IR");
                 
-                else if ((instr.immediate == RVInstruction::IMM_ECALL) && (instr.rd == 0) && (instr.rs1 == 0))
-                    throw std::runtime_error("ECALL");
-                
-                else if ((instr.immediate == RVInstruction::IMM_EBREAK) && (instr.rd == 0) && (instr.rs1 == 0))
+                else if ((instr.immediate == RVInstruction::IMM_ECALL) && (instr.rd == 0) && (instr.rs1 == 0)) {
+                    if (regs[REG_A0] >= ecall_handlers.size())
+                        EmptyECallHandler(memory, regs, fregs);
+                    
+                    else
+                        ecall_handlers[regs[REG_A0]](memory, regs, fregs);
+                    
+                } else if ((instr.immediate == RVInstruction::IMM_EBREAK) && (instr.rd == 0) && (instr.rs1 == 0))
                     throw std::runtime_error("EBREAK");
 
                 else
@@ -703,3 +707,9 @@ VirtualMachine::TLBEntry VirtualMachine::GetTLBLookup(uint32_t phys_addr, bool b
 size_t VirtualMachine::GetInstructionsPerSecond() {
     return instructions_per_second;
 }
+
+void VirtualMachine::EmptyECallHandler(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<float, REGISTER_COUNT>&) {
+    throw std::runtime_error(std::format("Unknown ECall handler: {}", regs[REG_A0]));
+}
+
+std::vector<VirtualMachine::ECallHandler> VirtualMachine::ecall_handlers;
