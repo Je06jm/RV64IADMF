@@ -282,7 +282,7 @@ RVInstruction::operator std::string() {
                 
                 case FUNC3_SLLI:
                     if (func7 == FUNC7_SLLI)
-                        s = std::format("ORI {}, {}, {}", register_names[rd], register_names[rs1], immediate);
+                        s = std::format("SLLI {}, {}, {}", register_names[rd], register_names[rs1], rs2);
                     
                     else
                         s = "Invalid";
@@ -292,11 +292,11 @@ RVInstruction::operator std::string() {
                 case FUNC3_SHIFT_RIGHT_IMMEDIATE:
                     switch (func7) {
                         case FUNC7_SRLI:
-                            s = std::format("SRLI {}, {}, {}", register_names[rd], register_names[rs1], immediate);
+                            s = std::format("SRLI {}, {}, {}", register_names[rd], register_names[rs1], rs2);
                             break;
                         
                         case FUNC7_SRAI:
-                            s = std::format("SRAI {}, {}, {}", register_names[rd], register_names[rs1], immediate);
+                            s = std::format("SRAI {}, {}, {}", register_names[rd], register_names[rs1], rs2);
                             break;
                         
                         default:
@@ -868,6 +868,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv_inst.rd = rd;
             rv_inst.func3 = func3;
             rv_inst.rs1 = rs1;
+            rv_inst.rs2 = rs2;
             rv_inst.immediate = instr >> 20;
             break;
         
