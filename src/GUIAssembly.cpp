@@ -11,6 +11,9 @@ void GUIAssembly::Draw() {
     if (ImGui::Begin("Assembly")) {
         uint32_t pc = vm.GetPC();
 
+        bool needs_scroll = pc != last_pc;
+        last_pc = pc;
+
         int64_t window_begin = (pc >> 2) - WINDOW / 2 + WINDOW_SLIDE;
 
         if (window_begin < 0) window_begin = 0;
@@ -36,6 +39,7 @@ void GUIAssembly::Draw() {
             RVInstruction instr = RVInstruction::FromUInt32(instrs[i]);
             if (addr == pc) {
                 ImGui::TextColored(gui_pc_highlight_color, "-> 0x%08x %s", addr, std::string(instr).c_str());
+                if (needs_scroll) ImGui::SetScrollHereY();
             } else if (vm.IsBreakPoint(addr)) {
                 ImGui::TextColored(gui_break_highlight_color, "   0x%08x %s", addr, std::string(instr).c_str());
             } else {

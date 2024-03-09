@@ -89,7 +89,7 @@ int main(int argc, const char** argv) {
         if (auto_run)
             vm.Step();
         else
-            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false))
+            if (ImGui::IsKeyPressed(ImGuiKey_Enter, true))
                 if (vm.Step(1))
                     std::cout << "Breakpoint" << std::endl;
         
