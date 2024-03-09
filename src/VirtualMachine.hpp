@@ -261,7 +261,7 @@ public:
     }
 
     inline uint32_t GetSP() const {
-        return regs[2];
+        return regs[REG_SP];
     }
 
     TLBEntry GetTLBLookup(uint32_t phys_addr, bool bypass_cache = false);

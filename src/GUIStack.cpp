@@ -15,7 +15,7 @@ void GUIStack::Draw() {
         int64_t window_end = window_begin + WINDOW;
         int64_t window_end_pc = window_end << 2;
 
-        if (static_cast<uint32_t>(window_end_pc) >= memory.GetUsedMemory()) {
+        if (static_cast<uint32_t>(window_end_pc) >= memory.GetTotalMemory()) {
             window_end = memory.GetUsedMemory() >> 2;
             window_end_pc = window_end << 2;
             window_begin = window_end - WINDOW;
