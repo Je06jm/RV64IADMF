@@ -1,6 +1,7 @@
 #include "VirtualMachine.hpp"
 
 #include "RV32I.hpp"
+#include "DeltaTime.hpp"
 
 #include <format>
 #include <cassert>
@@ -190,6 +191,8 @@ bool VirtualMachine::Step(uint32_t steps) {
         v.s = value;
         return v.u;
     };
+
+    ticks += steps;
     
     for (uint32_t i = 0; i < steps && running; i++) {
         if (pc & 0b11)
@@ -770,7 +773,26 @@ VirtualMachine::TLBEntry VirtualMachine::GetTLBLookup(uint32_t phys_addr, bool b
 }
 
 size_t VirtualMachine::GetInstructionsPerSecond() {
-    return instructions_per_second;
+    double total_time = 0.0;
+    uint32_t total_ticks = 0;
+
+    for (size_t i = 0; i < history_delta.size(); i++) {
+        total_time += history_delta[i];
+        total_ticks += history_tick[i];
+    }
+
+    return total_ticks / total_time;
+}
+
+void VirtualMachine::UpdateTime() {
+    history_delta.push_back(delta_time());
+    history_tick.push_back(ticks);
+    ticks = 0;
+
+    while (history_delta.size() > MAX_HISTORY) {
+        history_delta.erase(history_delta.begin());
+        history_tick.erase(history_tick.begin());
+    }
 }
 
 void VirtualMachine::EmptyECallHandler(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<float, REGISTER_COUNT>&) {

@@ -75,6 +75,8 @@ int main(int argc, const char** argv) {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
+        vm.UpdateTime();
+
         // Do rendering
 
         mem_viewer.Draw();
@@ -86,9 +88,10 @@ int main(int argc, const char** argv) {
         if (ImGui::IsKeyPressed(ImGuiKey_Space, false))
             auto_run = !auto_run;
 
-        if (auto_run)
-            vm.Step();
-        else
+        if (auto_run) {
+            if (vm.Step(10000)) auto_run = false;
+            
+        } else
             if (ImGui::IsKeyPressed(ImGuiKey_Enter, true))
                 if (vm.Step(1))
                     std::cout << "Breakpoint" << std::endl;

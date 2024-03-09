@@ -241,6 +241,12 @@ private:
 
     std::set<uint32_t> break_points;
 
+    uint32_t ticks;
+    std::vector<double> history_delta;
+    std::vector<uint32_t> history_tick;
+
+    static constexpr size_t MAX_HISTORY = 15;
+
 public:
     const size_t instructions_per_second;
     VirtualMachine(Memory& memory, uint32_t starting_pc, size_t instructions_per_second, uint32_t hart_id);
@@ -281,6 +287,7 @@ public:
         return break_points.contains(addr);
     }
 
+    void UpdateTime();
 
     using ECallHandler = std::function<void(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<float, REGISTER_COUNT>& fregs)>;
 

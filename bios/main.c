@@ -8,7 +8,7 @@ void machine_call(uint32_t sys, ...);
 #define MACHINE_CALL_PRINT 0
 
 void putc(char c) {
-    char* buffer = (char*)0x100000;
+    static char buffer[512];
     static size_t index = 0;
     static size_t size = 0;
 
@@ -110,6 +110,11 @@ void printf(const char* fmt, ...) {
                     print_num(num, 16, false, true);
                     break;
                 }
+                case 'b': {
+                    uint32_t num = va_arg(args, uint32_t);
+                    print_num(num, 2, false, false);
+                    break;
+                }
                 case 'c': {
                     c = va_arg(args, uint32_t);
                     putc(c);
@@ -141,4 +146,5 @@ void bios_main() {
     printf("0x%x\n", 0xdeadbeef);
     printf("0X%X\n", 0XDEADBEEF);
     printf("%i\n", -13);
+    printf("0b%b\n", 0b11110001);
 }
