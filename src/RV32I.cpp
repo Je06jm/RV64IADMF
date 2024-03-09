@@ -443,7 +443,7 @@ RVInstruction::operator std::string() {
             if (func3 == FUNC3_ATOMIC) {
                 switch (func7 & FUNC7_ATOMIC_MASK) {
                     case FUNC7_LR_W:
-                        if (rs1 == RS2_LR_W)
+                        if (rs2 == RS2_LR_W)
                             s = std::format("LR.W {}, ({})", register_names[rd], register_names[rs1]);
                         
                         else
@@ -451,43 +451,43 @@ RVInstruction::operator std::string() {
                         break;
                     
                     case FUNC7_SC_W:
-                        s = std::format("SC.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("SC.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOSWAP_W:
-                        s = std::format("AMOSWAP.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOSWAP.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOADD_W:
-                        s = std::format("AMOADD.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOADD.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOXOR_W:
-                        s = std::format("AMOXOR.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOXOR.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOAND_W:
-                        s = std::format("AMOAND.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOAND.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOOR_W:
-                        s = std::format("AMOOR.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOOR.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOMIN_W:
-                        s = std::format("AMOMIN.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOMIN.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOMAX_W:
-                        s = std::format("AMOMAX.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOMAX.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOMINU_W:
-                        s = std::format("AMOMINU.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOMINU.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     case FUNC7_AMOMAXU_W:
-                        s = std::format("AMOMAXU.W {}, {}, ({})", register_names[rd], register_names[rs1], register_names[rs2]);
+                        s = std::format("AMOMAXU.W {}, {}, ({})", register_names[rd], register_names[rs2], register_names[rs1]);
                         break;
                     
                     default:
