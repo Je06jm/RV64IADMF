@@ -13,8 +13,8 @@ void putc(char c) {
     static size_t size = 0;
 
     bool flush = false;
-    if (c == 0 && index) flush = true;
-    if (c == 0) return;
+    if (c == 0 && size) flush = true;
+    else if (c == 0) return;
     if (c == '\n') flush = true;
     if (c == '\r') {
         index = 0;
@@ -107,7 +107,7 @@ void printf(const char* fmt, ...) {
                 }
                 case 'X': {
                     uint32_t num = va_arg(args, uint32_t);
-                    print_num(num, 16, true, false);
+                    print_num(num, 16, false, true);
                     break;
                 }
                 case 'c': {
@@ -137,5 +137,8 @@ void printf(const char* fmt, ...) {
 
 void bios_main() {
     printf("Hello world!\n");
-    printf("%i", 42);
+    printf("%i\n", 42);
+    printf("0x%x\n", 0xdeadbeef);
+    printf("0X%X\n", 0XDEADBEEF);
+    printf("%i\n", -13);
 }
