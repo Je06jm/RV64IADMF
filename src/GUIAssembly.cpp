@@ -36,6 +36,8 @@ void GUIAssembly::Draw() {
             RVInstruction instr = RVInstruction::FromUInt32(instrs[i]);
             if (addr == pc) {
                 ImGui::TextColored(gui_pc_highlight_color, "-> 0x%08x %s", addr, std::string(instr).c_str());
+            } else if (vm.IsBreakPoint(addr)) {
+                ImGui::TextColored(gui_break_highlight_color, "   0x%08x %s", addr, std::string(instr).c_str());
             } else {
                 ImGui::Text("   0x%08x %s", addr, std::string(instr).c_str());
             }

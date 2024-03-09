@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <array>
 #include <vector>
+#include <set>
 #include <thread>
 #include <mutex>
 #include <memory>
@@ -171,6 +172,8 @@ private:
     bool running = false;
     std::string err = "";
 
+    std::set<uint32_t> break_points;
+
 public:
     const size_t instructions_per_second;
     VirtualMachine(Memory& memory, uint32_t starting_pc, size_t instructions_per_second, uint32_t hart_id);
@@ -182,7 +185,7 @@ public:
     inline bool IsRunning() const { return running; }
     inline void Stop() { running = false; }
 
-    void Step(uint32_t steps = 1000);
+    bool Step(uint32_t steps = 1000);
 
     void GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<float, REGISTER_COUNT>& fregisters, uint32_t& pc);
 
@@ -197,6 +200,19 @@ public:
     TLBEntry GetTLBLookup(uint32_t phys_addr, bool bypass_cache = false);
 
     size_t GetInstructionsPerSecond();
+
+    inline void SetBreakPoint(uint32_t addr) {
+        break_points.insert(addr);
+    }
+
+    inline void ClearBreakPoint(uint32_t addr) {
+        if (break_points.contains(addr))
+            break_points.erase(addr);
+    }
+
+    inline bool IsBreakPoint(uint32_t addr) {
+        return break_points.contains(addr);
+    }
 };
 
 #endif

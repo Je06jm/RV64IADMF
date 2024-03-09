@@ -157,7 +157,7 @@ VirtualMachine::~VirtualMachine() {
     running = false;
 }
 
-void VirtualMachine::Step(uint32_t steps) {
+bool VirtualMachine::Step(uint32_t steps) {
     auto InvalidInstruction = [&]() {
         uint32_t instr = memory.Read32(pc);
         throw std::runtime_error(std::format("Invalid instruction at 0x{:08x}: 0x{:08x}", pc, instr));
@@ -656,8 +656,11 @@ void VirtualMachine::Step(uint32_t steps) {
         }
 
         if (instr.rd == 0) regs[instr.rd] = 0;
+
+        if (IsBreakPoint(pc)) return true;
     }
 
+    return false;
 }
 
 void VirtualMachine::GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<float, REGISTER_COUNT>& fregisters, uint32_t& pc) {
