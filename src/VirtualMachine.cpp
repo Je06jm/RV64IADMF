@@ -206,17 +206,21 @@ bool VirtualMachine::Step(uint32_t steps) {
                 regs[instr.rd] = pc + instr.immediate;
                 break;
             
-            case RVInstruction::OP_JAL:
-                regs[instr.rd] = pc + 4;
+            case RVInstruction::OP_JAL: {
+                uint32_t next_pc = pc + 4;
                 pc += SignExtend(instr.immediate, 20);
+                regs[instr.rd] = next_pc;
                 break;
+            }
             
-            case RVInstruction::OP_JALR:
+            case RVInstruction::OP_JALR: {
                 if (instr.func3 != RVInstruction::FUNC3_JALR) InvalidInstruction();
-                
-                regs[instr.rd] = pc + 4;
+
+                uint32_t next_pc = pc + 4; 
                 pc = (regs[instr.rs1] + SignExtend(instr.immediate, 11)) & 0xfffffffe;
+                regs[instr.rd] = next_pc;
                 break;
+            }
             
             case RVInstruction::OP_BRANCH:
                 switch (instr.func3) {
