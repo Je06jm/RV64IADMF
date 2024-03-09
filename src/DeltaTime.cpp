@@ -1,6 +1,6 @@
 #include "DeltaTime.hpp"
 
-#include <glfw3.h>
+#include "OpenGL.hpp"
 
 void _DeltaTime::Update() {
     double current = glfwGetTime();
