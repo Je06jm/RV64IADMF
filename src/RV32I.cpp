@@ -518,7 +518,7 @@ RVInstruction::operator std::string() {
             break;
         
         case OP_FMADD_S:
-            if ((func7 & FUNC7_FUSED_MASK) == FUNC7_FMADD_S)
+            if ((func7 & FUNC7_FUSED_MASK) == FMT_S)
                 s = std::format("FMADD.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
             
             else
@@ -527,7 +527,7 @@ RVInstruction::operator std::string() {
             break;
 
         case OP_FMSUB_S:
-            if ((func7 & FUNC7_FUSED_MASK) == FUNC7_FMSUB_S)
+            if ((func7 & FUNC7_FUSED_MASK) == FMT_S)
                 s = std::format("FMSUB.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
             
             else
@@ -536,7 +536,7 @@ RVInstruction::operator std::string() {
             break;
         
         case OP_FNMSUB_S:
-            if ((func7 & FUNC7_FUSED_MASK) == FUNC7_FNMADD_S)
+            if ((func7 & FUNC7_FUSED_MASK) == FMT_S)
                 s = std::format("FNMSUB.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
             
             else
@@ -545,7 +545,7 @@ RVInstruction::operator std::string() {
             break;
         
         case OP_FNMADD_S:
-            if ((func7 & FUNC7_FUSED_MASK) == FUNC7_FNMADD_S)
+            if ((func7 & FUNC7_FUSED_MASK) == FMT_S)
                 s = std::format("FNMADD.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
             
             else

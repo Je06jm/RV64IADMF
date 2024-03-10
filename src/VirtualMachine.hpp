@@ -23,6 +23,14 @@ private:
     static constexpr uint16_t CSR_FFLAGS = 0x001;
     static constexpr uint16_t CSR_FRM = 0x002;
     static constexpr uint16_t CSR_FCSR = 0x003;
+
+    static constexpr uint32_t CSR_FCSR_NV = 0b10000;
+    static constexpr uint32_t CSR_FCSR_DZ = 0b1000;
+    static constexpr uint32_t CSR_FCSR_OF = 0b100;
+    static constexpr uint32_t CSR_FCSR_UF = 0b10;
+    static constexpr uint32_t CSR_FCSR_NX = 0b1;
+
+    static constexpr uint32_t CSR_FCSR_FLAGS = 0b11111;
     
     static constexpr uint16_t CSR_CYCLE = 0xc00;
     static constexpr uint16_t CSR_TIME = 0xc01;
@@ -112,6 +120,10 @@ private:
     bool CSRPrivilegeCheck(uint32_t csr);
     uint32_t ReadCSR(uint32_t csr, bool is_internal_read = false);
     void WriteCSR(uint32_t csr, uint32_t value);
+
+    static const int default_rounding_mode;
+    bool ChangeRoundingMode(uint8_t rm = 0xff);
+    bool CheckFloatErrors();
 
     static constexpr size_t TLB_CACHE_SIZE = 16;
 

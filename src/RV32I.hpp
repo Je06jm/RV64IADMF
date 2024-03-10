@@ -111,16 +111,19 @@ struct RVInstruction {
     static constexpr uint8_t FUNC7_FUSED_MASK = 0b11;
 
     static constexpr uint8_t OP_FMADD_S = 0b1000011;
-    static constexpr uint8_t FUNC7_FMADD_S = 0b00;
-    
     static constexpr uint8_t OP_FMSUB_S = 0b1000111;
-    static constexpr uint8_t FUNC7_FMSUB_S = 0b00;
-
     static constexpr uint8_t OP_FNMSUB_S = 0b1001011;
-    static constexpr uint8_t FUNC7_FNMSUB_S = 0b00;
-
     static constexpr uint8_t OP_FNMADD_S = 0b1001111;
-    static constexpr uint8_t FUNC7_FNMADD_S = 0b00;
+    static constexpr uint8_t FMT_S = 0b00;
+
+    static constexpr uint8_t RM_ROUND_TO_NEAREST_TIES_EVEN = 0b000;
+    static constexpr uint8_t RM_ROUND_TO_ZERO = 0b001;
+    static constexpr uint8_t RM_ROUND_DOWN = 0b010;
+    static constexpr uint8_t RM_ROUND_UP = 0b011;
+    static constexpr uint8_t RM_ROUND_TO_NEAREST_TIES_MAX_MAGNITUDE = 0b100;
+    static constexpr uint8_t RM_INVALID0 = 0b101;
+    static constexpr uint8_t RM_INVALID1 = 0b110;
+    static constexpr uint8_t RM_DYNAMIC = 0b111;
 
     static constexpr uint8_t OP_FLOAT = 0b1010011;
     static constexpr uint8_t FUNC7_FADD_S = 0b0;
@@ -203,7 +206,15 @@ struct RVInstruction {
     uint32_t immediate;
     uint8_t opcode;
     uint8_t rd, rs1, rs2;
-    uint8_t func3, func7;
+    uint8_t func3;
+
+    union {
+        uint8_t func7;
+        struct {
+            uint8_t fmt : 2;
+            uint8_t rs3 : 5;
+        };
+    };
 
     operator std::string();
 

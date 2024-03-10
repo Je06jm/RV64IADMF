@@ -6,6 +6,10 @@
 #include <format>
 #include <cassert>
 #include <stdexcept>
+#include <cmath>
+#include <fenv.h>
+
+const int VirtualMachine::default_rounding_mode = fegetround();
 
 bool VirtualMachine::TLBEntry::IsFlagsSet(uint32_t flags) const {
     assert(IsVirtual());
@@ -156,6 +160,56 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
     csrs[csr] = value;
 }
 
+bool VirtualMachine::ChangeRoundingMode(uint8_t rm) {
+    switch (rm) {
+        case RVInstruction::RM_ROUND_TO_NEAREST_TIES_EVEN:
+            fesetround(FE_TONEAREST);
+            break;
+        
+        case RVInstruction::RM_ROUND_TO_ZERO:
+            fesetround(FE_TOWARDZERO);
+            break;
+        
+        case RVInstruction::RM_ROUND_DOWN:
+            fesetround(FE_DOWNWARD);
+            break;
+        
+        case RVInstruction::RM_ROUND_UP:
+            fesetround(FE_UPWARD);
+            break;
+        
+        case RVInstruction::RM_ROUND_TO_NEAREST_TIES_MAX_MAGNITUDE:
+        case RVInstruction::RM_INVALID0:
+        case RVInstruction::RM_INVALID1:
+            return false;
+        
+        case RVInstruction::RM_DYNAMIC:
+            return ChangeRoundingMode((csrs[CSR_FCSR] >> 5) & 0b111);
+        
+        default:
+            fesetround(default_rounding_mode);
+            break;
+    }
+
+    return true;
+}
+
+bool VirtualMachine::CheckFloatErrors() {
+    fexcept_t except;
+    fegetexceptflag(&except, FE_ALL_EXCEPT);
+
+    csrs[CSR_FCSR] &= ~CSR_FCSR_FLAGS;
+
+    if (except & FE_DIVBYZERO) csrs[CSR_FCSR] |= CSR_FCSR_DZ;
+    if (except & FE_INEXACT) csrs[CSR_FCSR] |= CSR_FCSR_NX;
+    if (except & FE_INVALID) csrs[CSR_FCSR] |= CSR_FCSR_NV;
+    if (except & FE_OVERFLOW) csrs[CSR_FCSR] |= CSR_FCSR_OF;
+    if (except & FE_UNDERFLOW) csrs[CSR_FCSR] |= CSR_FCSR_UF;
+
+    if (except & (FE_DIVBYZERO | FE_INVALID)) return true;
+    return false;
+}
+
 VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t instructions_per_second, uint32_t hart_id) : memory{memory}, pc{starting_pc}, instructions_per_second{instructions_per_second} {
     for (auto& r : regs) {
         r = 0;
@@ -239,6 +293,28 @@ bool VirtualMachine::Step(uint32_t steps) {
 
         S32U32 v;
         v.s = value;
+        return v.u;
+    };
+
+    auto ToFloat = [](uint32_t value) {
+        union F32U32 {
+            float f;
+            uint32_t u;
+        };
+
+        F32U32 v;
+        v.u = value;
+        return v.f;
+    };
+
+    auto FromFloat = [](float value) {
+        union F32U32 {
+            float f;
+            uint32_t u;
+        };
+
+        F32U32 v;
+        v.f = value;
         return v.u;
     };
 
@@ -833,6 +909,171 @@ bool VirtualMachine::Step(uint32_t steps) {
                         break;
                 }
                 break;
+
+            case RVInstruction::OP_FLW:
+                if (instr.func3 != RVInstruction::FUNC3_FLW) InvalidInstruction();
+
+                fregs[instr.rd] = ToFloat(memory.Read32(regs[instr.rs1] + SignExtend(instr.immediate, 11)));
+                break;
+            
+            case RVInstruction::OP_FSW:
+                if (instr.func3 != RVInstruction::FUNC3_FSW) InvalidInstruction();
+
+                memory.Write32(regs[instr.rs1] + SignExtend(instr.immediate, 11), FromFloat(fregs[instr.rs2]));
+                break;
+            
+            case RVInstruction::OP_FMADD_S: {
+                if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+                
+                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                float result = fregs[instr.rs1] * fregs[instr.rs2] + fregs[instr.rs3];
+                ChangeRoundingMode();
+                
+                if (CheckFloatErrors())
+                    result = NAN;
+
+                fregs[instr.rd] = result;
+                break;
+            }
+
+            case RVInstruction::OP_FMSUB_S: {
+                if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+
+                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                float result = fregs[instr.rs1] * fregs[instr.rs2] - fregs[instr.rs3];
+                ChangeRoundingMode();
+
+                if (CheckFloatErrors())
+                    result = NAN;
+                
+                fregs[instr.rd] = result;
+                break;
+            }
+
+            case RVInstruction::OP_FNMSUB_S: {
+                if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+
+                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                float result = -(fregs[instr.rs1] * fregs[instr.rs2]) + fregs[instr.rs3];
+                ChangeRoundingMode();
+
+                if (CheckFloatErrors())
+                    result = NAN;
+                
+                fregs[instr.rd] = result;
+                break;
+            }
+
+            case RVInstruction::OP_FNMADD_S: {
+                if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+
+                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                float result = -(fregs[instr.rs1] * fregs[instr.rs2]) - fregs[instr.rs3];
+                ChangeRoundingMode();
+
+                if (CheckFloatErrors())
+                    result = NAN;
+
+                fregs[instr.rd] = result;
+                break;
+            }
+
+            case RVInstruction::OP_FLOAT:
+                switch (instr.func7) {
+                    case RVInstruction::FUNC7_FADD_S: {
+                        if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+
+                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                        float result = fregs[instr.rs1] + fregs[instr.rs2];
+                        ChangeRoundingMode();
+
+                        if (CheckFloatErrors())
+                            result = NAN;
+                        
+                        fregs[instr.rd] = result;
+                        break;
+                    }
+
+                    case RVInstruction::FUNC7_FSUB_S: {
+                        if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+
+                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                        float result = fregs[instr.rs1] - fregs[instr.rs2];
+                        ChangeRoundingMode();
+
+                        if (CheckFloatErrors())
+                            result = NAN;
+                        
+                        fregs[instr.rd] = result;
+                        break;
+                    }
+
+                    case RVInstruction::FUNC7_FMUL_S: {
+                        if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+
+                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                        float result = fregs[instr.rs1] * fregs[instr.rs2];
+                        ChangeRoundingMode();
+
+                        if (CheckFloatErrors())
+                            result = NAN;
+                        
+                        fregs[instr.rd] = result;
+                        break;
+                    }
+
+                    case RVInstruction::FUNC7_FDIV_S: {
+                        if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+
+                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                        float result = fregs[instr.rs1] / fregs[instr.rs2];
+                        ChangeRoundingMode();
+
+                        if (CheckFloatErrors())
+                            result = NAN;
+                        
+                        fregs[instr.rd] = result;
+                        break;
+                    }
+
+                    case RVInstruction::FUNC7_FSQRT_S: {
+                        if (instr.fmt != RVInstruction::FMT_S || instr.rs2 != 0) InvalidInstruction();
+
+                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                        float result = sqrtf(fregs[instr.rs1]);
+                        ChangeRoundingMode();
+
+                        if (CheckFloatErrors())
+                            result = NAN;
+                        
+                        fregs[instr.rd] = result;
+                        break;
+                    }
+
+                    case RVInstruction::FUNC7_FMIN_FMAX: {
+                        if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
+
+                        float lhs = fregs[instr.rs1];
+                        float rhs = fregs[instr.rs2];
+
+                        float result = 0.0f;
+
+                        switch (instr.func3) {
+                            case RVInstruction::FUNC3_FMIN_S:
+                                result = lhs < rhs ? lhs : rhs;
+                                break;
+                            
+                            case RVInstruction::FUNC3_FMAX_S:
+                                result = lhs > rhs ? lhs : rhs;
+                                break;
+                            
+                            default:
+                                InvalidInstruction();
+                        }
+
+                        break;
+                    }
+                }
 
             default:
                 InvalidInstruction();
