@@ -11,13 +11,13 @@
 #include <mutex>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 class VirtualMachine {
     friend class TLBEntry;
 
 public:
     static constexpr size_t REGISTER_COUNT = 32;
-    static constexpr size_t CSR_COUNT = 4096;
 
 private:
     static constexpr uint16_t CSR_FFLAGS = 0x001;
@@ -90,6 +90,10 @@ private:
     static constexpr uint16_t CSR_TDATA3 = 0x7a3;
     static constexpr uint16_t CSR_MCONTEXT = 0x7a8;
 
+    static constexpr uint8_t MACHINE_MODE = 0b00;
+    static constexpr uint8_t SUPERVISOR_MODE = 0b01;
+    static constexpr uint8_t USER_MODE = 0b10;
+
     static constexpr uint32_t ISA_BITS_MASK = 0b11 << 30;
     static constexpr uint32_t ISA_32_BITS = 1 << 30;
 
@@ -102,7 +106,12 @@ private:
 
     std::array<uint32_t, REGISTER_COUNT> regs;
     std::array<float, REGISTER_COUNT> fregs;
-    std::array<uint32_t, CSR_COUNT> csrs;
+
+    std::unordered_map<uint32_t, uint32_t> csrs;
+
+    bool CSRPrivilegeCheck(uint32_t csr);
+    uint32_t ReadCSR(uint32_t csr, bool is_internal_read = false);
+    void WriteCSR(uint32_t csr, uint32_t value);
 
     static constexpr size_t TLB_CACHE_SIZE = 16;
 

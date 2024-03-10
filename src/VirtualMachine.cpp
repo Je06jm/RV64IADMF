@@ -132,6 +132,30 @@ bool VirtualMachine::TLBEntry::CheckWrite(bool as_user) {
     return true;
 }
 
+bool VirtualMachine::CSRPrivilegeCheck(uint32_t csr) {
+    return true;
+}
+
+uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
+    if (!is_internal_read && !CSRPrivilegeCheck(csr))
+        throw std::runtime_error("CSR Read Privilege");
+    
+    if (!csrs.contains(csr))
+        throw std::runtime_error("Read Invalid CSR");
+    
+    return csrs[csr];
+}
+
+void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
+    if (!CSRPrivilegeCheck(csr))
+        throw std::runtime_error("CSR Write Privilege");
+    
+    if (!csrs.contains(csr))
+        throw std::runtime_error("Write Invalid CSR");
+    
+    csrs[csr] = value;
+}
+
 VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t instructions_per_second, uint32_t hart_id) : memory{memory}, pc{starting_pc}, instructions_per_second{instructions_per_second} {
     for (auto& r : regs) {
         r = 0;
@@ -141,17 +165,43 @@ VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t inst
         f = 0.0;
     }
 
-    for (auto& csr : csrs) {
-        csr = 0;
-    }
+    // User
+
+    csrs[CSR_FRM] = 0;
+    csrs[CSR_CYCLE] = 0;
+    csrs[CSR_TIME] = 0;
+    csrs[CSR_INSTRET] = 0;
+    csrs[CSR_CYCLEH] = 0;
+    csrs[CSR_TIMEH] = 0;
+    csrs[CSR_INSTRETH] = 0;
+
+    // Supervisor
+
+    csrs[CSR_SSTATUS] = 0;
+    csrs[CSR_SIE] = 0;
+    csrs[CSR_STVEC] = 0;
+    csrs[CSR_SCOUNTEREN] = 0;
+    csrs[CSR_SENVCFG] = 0;
+    csrs[CSR_SSCRATCH] = 0;
+    csrs[CSR_SEPC] = 0;
+    csrs[CSR_SCAUSE] = 0;
+    csrs[CSR_STVAL] = 0;
+    csrs[CSR_SIP] = 0;
+    csrs[CSR_SATP] = 0;
+    csrs[CSR_SCONTEXT] = 0;
+
+    // Machine
 
     csrs[CSR_MVENDORID] = 0;
-    csrs[CSR_MARCHID] = ('V' << 24) | ('M' << 16) | ('A' << 8) | ('C');
-    csrs[CSR_MIMPID] = ('H' << 24) | ('I' << 16) | ('N' << 8) | ('E');
+
+    csrs[CSR_MARCHID] = ('E' << 24) | ('N' << 16) | ('I' << 8) | ('H');
+    csrs[CSR_MIMPID] = ('C' << 24) | ('A' << 16) | ('M' << 8) | ('V');
 
     csrs[CSR_MHARTID] = hart_id;
 
-    csrs[CSR_MISA] = ISA_32_BITS | ISA_F | ISA_I | ISA_M;
+    csrs[CSR_MISA] = ISA_32_BITS | ISA_A | ISA_I | ISA_M;
+
+    csrs[CSR_MSTATUS] = 0;
 }
 
 VirtualMachine::~VirtualMachine() {
@@ -614,40 +664,113 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             case RVInstruction::OP_SYSTEM:
-                if ((instr.immediate == RVInstruction::IMM_MRET) && (instr.rs2 == RVInstruction::RS2_SRET_MRET) && (instr.rs1 == RVInstruction::RS1_SYSTEM) && (instr.rd == RVInstruction::RD_SYSTEM))
-                    throw std::runtime_error("SRET");
-                
-                else if ((instr.immediate == RVInstruction::IMM_MRET) && (instr.rs2 == RVInstruction::RS2_SRET_MRET) && (instr.rs1 == RVInstruction::RS1_SYSTEM) && (instr.rd == RVInstruction::RD_SYSTEM))
-                    throw std::runtime_error("MRET");
-                
-                else if ((instr.immediate == RVInstruction::IMM_WFI) && (instr.rs2 == RVInstruction::RS2_WFI) && (instr.rs1 == RVInstruction::RS1_SYSTEM) && (instr.rd == RVInstruction::RD_SYSTEM))
-                    throw std::runtime_error("WFI");
-                
-                else if ((instr.func7 == RVInstruction::FUNC7_SFENCE_VMA) && (instr.rd == RVInstruction::RD_SYSTEM))
-                    throw std::runtime_error("SFENCE.VMA");
-                
-                else if ((instr.func7 == RVInstruction::FUNC7_SINVAL_VMA) && (instr.rd == RVInstruction::RD_SYSTEM))
-                    throw std::runtime_error("SINVAL.VMA");
-                
-                else if ((instr.func7 == RVInstruction::FUNC7_SFENCE_VMA) && (instr.rs2 == RVInstruction::RS2_SFENCE_W_INVAL) && (instr.rs1 == RVInstruction::RS1_SYSTEM) && (instr.rd == RVInstruction::RD_SYSTEM))
-                    throw std::runtime_error("SFENCE.W.INVAL");
-                
-                else if ((instr.func7 == RVInstruction::FUNC7_SFENCE_VMA) && (instr.rs2 == RVInstruction::RS2_SFENCE_INVAL_IR) && (instr.rs1 == RVInstruction::RS1_SYSTEM) && (instr.rd == RVInstruction::RD_SYSTEM))
-                    throw std::runtime_error("SFENCE.INVAL.IR");
-                
-                else if ((instr.immediate == RVInstruction::IMM_ECALL) && (instr.rd == 0) && (instr.rs1 == 0)) {
-                    if (regs[REG_A0] >= ecall_handlers.size())
-                        EmptyECallHandler(memory, regs, fregs);
-                    
-                    else
-                        ecall_handlers[regs[REG_A0]](memory, regs, fregs);
-                    
-                } else if ((instr.immediate == RVInstruction::IMM_EBREAK) && (instr.rd == 0) && (instr.rs1 == 0))
-                    throw std::runtime_error("EBREAK");
+                switch (instr.func3) {
+                    case RVInstruction::FUNC3_SYSTEM:
+                        if (instr.rd != RVInstruction::RD_SYSTEM) InvalidInstruction();
 
-                else
-                    InvalidInstruction();
-                
+                        switch (instr.immediate) {
+                            case RVInstruction::IMM_ECALL:
+                                if (regs[REG_A0] >= ecall_handlers.size())
+                                    EmptyECallHandler(memory, regs, fregs);
+                                
+                                else
+                                    ecall_handlers[regs[REG_A0]](memory, regs, fregs);
+                                
+                                break;
+                            
+                            case RVInstruction::IMM_EBREAK:
+                                throw std::runtime_error("EBREAK");
+                                break;
+                            
+                            default:
+                                switch (instr.immediate) {
+                                    case RVInstruction::IMM_URET:
+                                        throw std::runtime_error("URET");
+                                        break;
+                                    
+                                    case RVInstruction::IMM_SRET:
+                                        throw std::runtime_error("SRET");
+                                        break;
+                                    
+                                    case RVInstruction::IMM_MRET:
+                                        throw std::runtime_error("MRET");
+                                        break;
+
+                                    case RVInstruction::IMM_WFI:
+                                        throw std::runtime_error("WFI");
+                                        break;
+                                    
+                                    default:
+                                        InvalidInstruction();
+                                        break;
+                                }
+                                break;
+                            }
+                            break;
+                    
+                    case RVInstruction::FUNC3_CSRRW: {
+                        uint32_t value = regs[instr.rs1];
+                        if (instr.rd != REG_ZERO)
+                            regs[instr.rd] = ReadCSR(instr.immediate);
+                        
+                        WriteCSR(instr.immediate, value);
+                        break;
+                    }
+                    
+                    case RVInstruction::FUNC3_CSRRS: {
+                        uint32_t value = regs[instr.rs1];
+                        if (instr.rd != REG_ZERO)
+                            regs[instr.rd] = ReadCSR(instr.immediate);
+                        
+                        if (instr.rs1 != REG_ZERO)
+                            WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) | value);
+
+                        break;
+                    }
+                    
+                    case RVInstruction::FUNC3_CSRRC: {
+                        uint32_t value = regs[instr.rs1];
+                        if (instr.rd != REG_ZERO)
+                            regs[instr.rd] = ReadCSR(instr.immediate);
+                        
+                        if (instr.rs1 != REG_ZERO)
+                            WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) & ~value);
+                        
+                        break;
+                    }
+                    
+                    case RVInstruction::FUNC3_CSRRWI: {
+                        uint32_t value = instr.rs1;
+                        if (instr.rd != REG_ZERO)
+                            regs[instr.rd] = ReadCSR(instr.immediate);
+                        
+                        WriteCSR(instr.immediate, value);
+                        break;
+                    }
+                    
+                    case RVInstruction::FUNC3_CSRRSI: {
+                        uint32_t value = instr.rs1;
+                        if (instr.rd != REG_ZERO)
+                            regs[instr.rd] = ReadCSR(instr.immediate);
+                        
+                        WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) | value);
+                        break;
+                    }
+                    
+                    case RVInstruction::FUNC3_CSRRCI: {
+                        uint32_t value = instr.rs1;
+                        if (instr.rd != REG_ZERO)
+                            regs[instr.rd] = ReadCSR(instr.immediate);
+                        
+                        WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) & ~value);
+                        break;
+                    }
+                    
+                    default:
+                        InvalidInstruction();
+                        break;
+
+                }
                 break;
 
             case RVInstruction::OP_ATOMIC:

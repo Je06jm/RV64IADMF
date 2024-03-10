@@ -8,3 +8,7 @@ void _DeltaTime::Update() {
     delta_time = current - last;
     last = current;
 }
+
+double _DeltaTime::GetCurrentTime() {
+    return glfwGetTime();
+}

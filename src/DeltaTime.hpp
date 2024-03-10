@@ -9,6 +9,7 @@ public:
     inline double operator()() { return delta_time; }
 
     void Update();
+    double GetCurrentTime();
 };
 
 inline _DeltaTime delta_time;

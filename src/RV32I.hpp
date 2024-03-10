@@ -172,6 +172,7 @@ struct RVInstruction {
     static constexpr uint16_t IMM_ECALL = 0b0;
     static constexpr uint16_t IMM_EBREAK = 0b000000000001;
 
+    static constexpr uint16_t IMM_URET = 0b000000000010;
     static constexpr uint16_t IMM_MRET = 0b000100000010;
     static constexpr uint16_t IMM_SRET = 0b001100000010;
     static constexpr uint8_t RS2_SRET_MRET = 0b00010;
