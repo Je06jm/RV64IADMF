@@ -281,7 +281,7 @@ RVInstruction::operator std::string() {
                     break;
                 
                 case FUNC3_SLLI:
-                    if (func7 == FUNC7_SLLI)
+                    if ((immediate >> 5) == FUNC7_SLLI)
                         s = std::format("SLLI {}, {}, {}", register_names[rd], register_names[rs1], rs2);
                     
                     else
@@ -290,7 +290,7 @@ RVInstruction::operator std::string() {
                     break;
                 
                 case FUNC3_SHIFT_RIGHT_IMMEDIATE:
-                    switch (func7) {
+                    switch ((immediate >> 5)) {
                         case FUNC7_SRLI:
                             s = std::format("SRLI {}, {}, {}", register_names[rd], register_names[rs1], rs2);
                             break;

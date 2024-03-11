@@ -534,18 +534,18 @@ bool VirtualMachine::Step(uint32_t steps) {
                     case RVInstruction::FUNC3_SLLI:
                         if (instr.func7 != RVInstruction::FUNC7_SLLI) InvalidInstruction();
 
-                        regs[instr.rd] = regs[instr.rs1] << (instr.immediate & 0x1f);
+                        regs[instr.rd] = regs[instr.rs1] << instr.rs2;
                         break;
                     
-                    case RVInstruction::FUNC3_SHIFT_RIGHT_IMMEDIATE:
-                        switch (instr.func7) {
+                    case RVInstruction::FUNC3_SHIFT_RIGHT_IMMEDIATE: {
+                        switch (instr.immediate >> 5) {
                             case RVInstruction::FUNC7_SRLI:
-                                regs[instr.rd] = regs[instr.rs1] >> (instr.immediate & 0x1f);
+                                regs[instr.rd] = regs[instr.rs1] >> instr.rs2;
                                 break;
                             
                             case RVInstruction::FUNC7_SRAI: {
                                 int32_t value = AsSigned(regs[instr.rs1]);
-                                value >>= instr.immediate & 0x1f;
+                                value >>= instr.rs2;
                                 regs[instr.rd] = AsUnsigned(value);
                                 break;
                             }
@@ -555,6 +555,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                                 break;
                         }
                         break;
+                    }
                     
                     default:
                         InvalidInstruction();
