@@ -1,6 +1,9 @@
 LD = g++
 LD_FLAGS = -Llibs -lglfw3dll
 
+AR = ar
+AR_FLAGS = rvs
+
 IMGUI_DIR = thirdparties/imgui
 
 CXX = g++
@@ -13,9 +16,15 @@ CXX_OBJS = $(patsubst %.cpp,%.o,$(CXX_SOURCES))
 CC_SOURCES = $(wildcard src/*.c)
 CC_OBJS = $(patsubst %.c,%.o,$(CC_SOURCES))
 
+APP_SOURES = $(wildcard app/*.cpp)
+APP_OBJS = $(patsubst %.cpp,%.o,$(APP_SOURES))
+APP_FLAGS = -Isrc
+
 CXX_HEADERS = $(wildcard src/*.hpp)
 
-PROGRAM = RV32IMF
+LIBRARY = rv32adfima.a
+
+PROGRAM = RV32ADFIMA.exe
 
 BIOS_LD = ld.lld
 BIOS_LD_FLAGS = -T bios/linker.ld
@@ -48,28 +57,36 @@ BIOS = bios
 %.rv_o: %.S $(BIOS_CC_HEADERS)
 	$(BIOS_CC) $(BIOS_CC_FLAGS) -c $< -o $@
 
-all: CXX_FLAGS += -O2
-all: $(CXX_OBJS) $(CC_OBJS) $(CXX_HEADERS)
-	$(LD) -o $(PROGRAM) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O2
+library: CXX_FLAGS += -O2
+library: $(CXX_OBJS) $(CC_OBJS) $(CXX_HEADERS)
+	$(AR) $(AR_FLAGS) $(LIBRARY) $(CXX_OBJS) $(CC_OBJS)
 
-debug: CXX_FLAGS += -g
-debug: $(CXX_OBJS) $(CC_OBJS) $(CXX_HEADERS)
-	$(LD) -o $(PROGRAM) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -g
+debug_library: CXX_FLAGS += -g
+debug_library: $(CXX_OBJS) $(CC_OBJS) $(CXX_HEADERS)
+	$(AR) $(AR_FLAGS) $(LIBRARY) $(CXX_OBJS) $(CC_OBJS)
+
+all: CXX_FLAGS += $(APP_FLAGS)
+all: library $(APP_OBJS)
+	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O2
+
+debug: CXX_FLAGS += $(APP_FLAGS)
+debug: library $(APP_OBJS)
+	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O2
 
 bios: $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS) $(BIOS_CC_HEADERS)
 	$(BIOS_LD) $(BIOS_LD_FLAGS) -o $(BIOS).elf $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS)
 	$(BIOS_OBJ_COPY) $(BIOS_OBJ_COPY_FLAGS) $(BIOS).elf $(BIOS).bin
 
 clean:
-	@-rm $(PROGRAM).*
 	@-rm $(PROGRAM)
 	@-rm $(CXX_OBJS)
 	@-rm $(CC_OBJS)
+	@-rm $(LIBRARY)
 
 clean_bios:
-	@-rm $(BIOS).*
-	@-rm $(BIOS)
+	@-rm $(BIOS).elf
+	@-rm $(BIOS).bin
 	@-rm $(BIOS_CC_OBJS)
 	@-rm $(BIOS_ASM_OBJS)
 
-PHONY: clean clean_bios
+PHONY: all debug clean clean_bios

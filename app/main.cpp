@@ -1,17 +1,17 @@
-#include "Window.hpp"
-#include "OpenGL.hpp"
-#include "DeltaTime.hpp"
+#include <Window.hpp>
+#include <OpenGL.hpp>
+#include <DeltaTime.hpp>
 
-#include "Memory.hpp"
-#include "VirtualMachine.hpp"
-#include "RV32I.hpp"
-#include "ECalls.hpp"
+#include <Memory.hpp>
+#include <VirtualMachine.hpp>
+#include <RV32I.hpp>
+#include <ECalls.hpp>
 
-#include "GUIMemoryViewer.hpp"
-#include "GUIAssembly.hpp"
-#include "GUIInfo.hpp"
-#include "GUIRegs.hpp"
-#include "GUIStack.hpp"
+#include <GUIMemoryViewer.hpp>
+#include <GUIAssembly.hpp>
+#include <GUIInfo.hpp>
+#include <GUIRegs.hpp>
+#include <GUIStack.hpp>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
