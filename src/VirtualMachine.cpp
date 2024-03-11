@@ -254,7 +254,7 @@ VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t inst
 
     csrs[CSR_MHARTID] = hart_id;
 
-    csrs[CSR_MISA] = ISA_32_BITS | ISA_A | ISA_I | ISA_M;
+    csrs[CSR_MISA] = ISA_32_BITS | ISA_A | ISA_D | ISA_F | ISA_I | ISA_M;
 
     csrs[CSR_MSTATUS] = 0;
 }

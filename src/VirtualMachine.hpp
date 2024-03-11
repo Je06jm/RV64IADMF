@@ -107,6 +107,7 @@ private:
     static constexpr uint32_t ISA_32_BITS = 1 << 30;
 
     static constexpr uint32_t ISA_A = 1<<0;
+    static constexpr uint32_t ISA_D = 1<<3;
     static constexpr uint32_t ISA_F = 1<<5;
     static constexpr uint32_t ISA_I = 1<<8;
     static constexpr uint32_t ISA_M = 1<<12;
