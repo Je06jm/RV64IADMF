@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <string>
+#include <cstdlib>
 
 using VM = VirtualMachine;
 
@@ -34,7 +35,19 @@ void BuiltinECallCIn(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& r
     regs[VM::REG_A0] = i;
 }
 
+void BuiltinECallExit(Memory&, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
+    union S32U32 {
+        uint32_t u;
+        int32_t s;
+    };
+
+    S32U32 value;
+    value.u = regs[VM::REG_A1];
+    std::exit(value.s);
+}
+
 void RegisterBuiltinECalls() {
     VM::RegisterECall(ECALL_COUT, BuiltinECallCOut);
     VM::RegisterECall(ECALL_CIN, BuiltinECallCIn);
+    VM::RegisterECall(ECALL_EXIT, BuiltinECallExit);
 }
