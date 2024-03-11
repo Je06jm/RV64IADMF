@@ -305,9 +305,7 @@ public:
             break_points.erase(addr);
     }
 
-    inline bool IsBreakPoint(uint32_t addr) {
-        return break_points.contains(addr);
-    }
+    bool IsBreakPoint(uint32_t addr);
 
     void UpdateTime();
 

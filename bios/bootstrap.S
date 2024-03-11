@@ -6,6 +6,7 @@
 .extern printf
 
 _start:
+    li t0, 1
     la sp, stack_top
     jal ra, bios_main
 
@@ -22,6 +23,11 @@ _start:
 .globl machine_call
 machine_call:
     ecall
+    ret
+
+.globl machine_break
+machine_break:
+    ebreak
     ret
 
 .data

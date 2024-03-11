@@ -63,8 +63,6 @@ int main(int argc, const char** argv) {
     vm.Start();
     delta_time.Update();
 
-    vm.SetBreakPoint(0x10);
-
     bool auto_run = false;
 
     while (!window.ShouldClose()) {

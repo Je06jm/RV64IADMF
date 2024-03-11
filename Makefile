@@ -24,7 +24,7 @@ BIOS_OBJ_COPY = llvm-objcopy
 BIOS_OBJ_COPY_FLAGS = -O binary
 
 BIOS_CC = clang
-BIOS_CC_FLAGS = -target riscv32 -march=rv32imaf
+BIOS_CC_FLAGS = -target riscv32 -march=rv32imafd
 
 BIOS_CC_HEADERS = $(wildcard bios/*.h)
 

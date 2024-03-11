@@ -784,7 +784,6 @@ bool VirtualMachine::Step(uint32_t steps) {
                                 break;
                             
                             case RVInstruction::IMM_EBREAK:
-                                throw std::runtime_error("EBREAK");
                                 break;
                             
                             default:
@@ -1737,6 +1736,17 @@ size_t VirtualMachine::GetInstructionsPerSecond() {
     }
 
     return total_ticks / total_time;
+}
+
+bool VirtualMachine::IsBreakPoint(uint32_t addr) {
+    if (break_points.contains(addr)) return true;
+
+    RVInstruction instr = RVInstruction::FromUInt32(memory.Read32(addr));
+    if (instr.opcode == RVInstruction::OP_SYSTEM &&
+        instr.func3 == RVInstruction::FUNC3_SYSTEM &&
+        instr.immediate == RVInstruction::IMM_EBREAK) return true;
+    
+    return false;
 }
 
 void VirtualMachine::UpdateTime() {

@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 void machine_call(uint32_t sys, ...);
+void machine_break();
 
 #define MACHINE_CALL_PRINT 0
 
@@ -115,6 +116,12 @@ void printf(const char* fmt, ...) {
                     print_num(num, 2, false, false);
                     break;
                 }
+                case 'f': {
+                    machine_break();
+                    int32_t num = va_arg(args, double) * 100.0;
+                    print_num(num, 10, true, false);
+                    break;
+                }
                 case 'c': {
                     c = va_arg(args, uint32_t);
                     putc(c);
@@ -141,7 +148,10 @@ void printf(const char* fmt, ...) {
 }
 
 void bios_main() {
-    printf("Hello world!\n");
+    float aa = 1.2;
+    float bb = 2.3;
+    float cc = aa + bb;
+    printf("Hello world! %f\n", cc);
     printf("%i\n", 42);
     printf("0x%x\n", 0xdeadbeef);
     printf("0X%X\n", 0XDEADBEEF);
