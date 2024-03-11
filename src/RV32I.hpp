@@ -102,19 +102,23 @@ struct RVInstruction {
     static constexpr uint8_t FUNC7_AMOMINU_W = 0b1100000;
     static constexpr uint8_t FUNC7_AMOMAXU_W = 0b1110000;
 
-    static constexpr uint8_t OP_FLW = 0b0000111;
+    static constexpr uint8_t OP_FL = 0b0000111;
     static constexpr uint8_t FUNC3_FLW = 0b010;
+    static constexpr uint8_t FUNC3_FLD = 0b011;
     
-    static constexpr uint8_t OP_FSW = 0b0100111;
+    static constexpr uint8_t OP_FS = 0b0100111;
     static constexpr uint8_t FUNC3_FSW = 0b010;
+    static constexpr uint8_t FUNC3_FSD = 0b011;
 
     static constexpr uint8_t FUNC7_FUSED_MASK = 0b11;
 
-    static constexpr uint8_t OP_FMADD_S = 0b1000011;
-    static constexpr uint8_t OP_FMSUB_S = 0b1000111;
-    static constexpr uint8_t OP_FNMSUB_S = 0b1001011;
-    static constexpr uint8_t OP_FNMADD_S = 0b1001111;
+    static constexpr uint8_t OP_FMADD = 0b1000011;
+    static constexpr uint8_t OP_FMSUB = 0b1000111;
+    static constexpr uint8_t OP_FNMSUB = 0b1001011;
+    static constexpr uint8_t OP_FNMADD = 0b1001111;
+
     static constexpr uint8_t FMT_S = 0b00;
+    static constexpr uint8_t FMT_D = 0b01;
 
     static constexpr uint8_t RM_ROUND_TO_NEAREST_TIES_EVEN = 0b000;
     static constexpr uint8_t RM_ROUND_TO_ZERO = 0b001;
@@ -126,44 +130,52 @@ struct RVInstruction {
     static constexpr uint8_t RM_DYNAMIC = 0b111;
 
     static constexpr uint8_t OP_FLOAT = 0b1010011;
-    static constexpr uint8_t FUNC7_FADD_S = 0b0;
-    static constexpr uint8_t FUNC7_FSUB_S = 0b0000100;
-    static constexpr uint8_t FUNC7_FMUL_S = 0b0001000;
-    static constexpr uint8_t FUNC7_FDIV_S = 0b0001100;
+    static constexpr uint8_t FUNC7_FADD = 0b00000;
+    static constexpr uint8_t FUNC7_FSUB = 0b00001;
+    static constexpr uint8_t FUNC7_FMUL = 0b00010;
+    static constexpr uint8_t FUNC7_FDIV = 0b00011;
 
-    static constexpr uint8_t FUNC7_FSQRT_S = 0b0101100;
-    static constexpr uint8_t RS2_FSQRT_S = 0;
+    static constexpr uint8_t FUNC7_FSQRT = 0b01011;
+    static constexpr uint8_t RS2_FSQRT = 0;
     
-    static constexpr uint8_t FUNC7_FSGNJ = 0b0010000;
-    static constexpr uint8_t FUNC3_FSGNJ_S = 0b000;
-    static constexpr uint8_t FUNC3_FSGNJN_S = 0b001;
-    static constexpr uint8_t FUNC3_FSGNJX_S = 0b010;
+    static constexpr uint8_t FUNC7_FSGNJ = 0b00100;
+    static constexpr uint8_t FUNC3_FSGNJ = 0b000;
+    static constexpr uint8_t FUNC3_FSGNJN = 0b001;
+    static constexpr uint8_t FUNC3_FSGNJX = 0b010;
 
-    static constexpr uint8_t FUNC7_FMIN_FMAX = 0b0010100;
-    static constexpr uint8_t FUNC3_FMIN_S = 0b000;
-    static constexpr uint8_t FUNC3_FMAX_S = 0b001;
+    static constexpr uint8_t FUNC7_FMIN_FMAX = 0b00101;
+    static constexpr uint8_t FUNC3_FMIN = 0b000;
+    static constexpr uint8_t FUNC3_FMAX = 0b001;
 
-    static constexpr uint8_t FUNC7_FCVT_W = 0b1100000;
+    static constexpr uint8_t FUNC7_FCVT_W = 0b11000;
     static constexpr uint8_t RS2_FCVT_W_S = 0b00000;
     static constexpr uint8_t RS2_FCVT_WU_S = 0b00001;
 
-    static constexpr uint8_t FUNC7_FMV_X_W_FCLASS = 0b1110000;
-    static constexpr uint8_t RS2_FMV_X_W_FCLASS = 0b00000;
+    static constexpr uint8_t FUNC7_FMV_X_FCLASS = 0b11100;
+
     static constexpr uint8_t FUNC3_FMV_X_W = 0b000;
-    static constexpr uint8_t FUNC3_FCLASS_S = 0b001;
+    static constexpr uint8_t RS2_FMV_X_W = 0b00000;
 
-    static constexpr uint8_t FUNC7_FLOAT_EQU = 0b1010000;
-    static constexpr uint8_t FUNC3_FEQ_S = 0b010;
-    static constexpr uint8_t FUNC3_FLT_S = 0b001;
-    static constexpr uint8_t FUNC3_FLE_S = 0b000;
+    static constexpr uint8_t FUNC3_FCLASS = 0b001;
+    static constexpr uint8_t RS2_FCLASS = 0b00000;
 
-    static constexpr uint8_t FUNC7_FCVT_S = 0b1101000;
-    static constexpr uint8_t RS2_FCVT_S_W = 0b00000;
-    static constexpr uint8_t RS2_FCVT_S_WU = 0b00001;
+    static constexpr uint8_t FUNC7_FCOMPARE = 0b10100;
+    static constexpr uint8_t FUNC3_FEQ = 0b010;
+    static constexpr uint8_t FUNC3_FLT = 0b001;
+    static constexpr uint8_t FUNC3_FLE = 0b000;
 
-    static constexpr uint8_t FUNC7_FMV_W_X = 0b1111000;
-    static constexpr uint8_t RS2_FMV_W_X = 0b00000;
+    static constexpr uint8_t FUNC7_FCVT = 0b11010;
+    static constexpr uint8_t RS2_FCVT_W = 0b00000;
+    static constexpr uint8_t RS2_FCVT_WU = 0b00001;
+
+    static constexpr uint8_t FUNC7_FMV_W_X = 0b11110;
     static constexpr uint8_t FUNC3_FMV_W_X = 0b000;
+    static constexpr uint8_t RS2_FMV_W_X = 0b00000;
+
+    static constexpr uint8_t FUNC7_FCVT_D = 0b01000;
+
+    static constexpr uint8_t RS2_FCVT_S_D = 0b00001;
+    static constexpr uint8_t RS2_FCVT_D_S = 0b00000;
 
     static constexpr uint8_t OP_FENCE = 0b0001111;
     static constexpr uint8_t FUNC3_FENCE = 0b000;

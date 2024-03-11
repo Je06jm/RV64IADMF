@@ -7,7 +7,7 @@
 
 using VM = VirtualMachine;
 
-void BuiltinEBreakPrint(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<float, VM::REGISTER_COUNT>&) {
+void BuiltinEBreakPrint(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
     std::string str = "";
 
     for (uint32_t addr = regs[VM::REG_A1], i = 0; i < regs[VM::REG_A2]; addr++, i++) {

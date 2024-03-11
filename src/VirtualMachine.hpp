@@ -2,6 +2,7 @@
 #define VIRTUAL_MACHINE_HPP
 
 #include "Memory.hpp"
+#include "Float.hpp"
 
 #include <cstdint>
 #include <array>
@@ -113,7 +114,7 @@ private:
     static constexpr uint32_t ISA_U = 1<<20;
 
     std::array<uint32_t, REGISTER_COUNT> regs;
-    std::array<float, REGISTER_COUNT> fregs;
+    std::array<Float, REGISTER_COUNT> fregs;
 
     std::unordered_map<uint32_t, uint32_t> csrs;
 
@@ -281,7 +282,7 @@ public:
 
     bool Step(uint32_t steps = 1000);
 
-    void GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<float, REGISTER_COUNT>& fregisters, uint32_t& pc);
+    void GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, uint32_t& pc);
 
     inline uint32_t GetPC() const {
         return pc;
@@ -310,10 +311,10 @@ public:
 
     void UpdateTime();
 
-    using ECallHandler = std::function<void(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<float, REGISTER_COUNT>& fregs)>;
+    using ECallHandler = std::function<void(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>& fregs)>;
 
 private:
-    static void EmptyECallHandler(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<float, REGISTER_COUNT>&);
+    static void EmptyECallHandler(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&);
 
     static std::vector<ECallHandler> ecall_handlers;
 

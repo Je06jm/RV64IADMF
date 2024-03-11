@@ -499,81 +499,143 @@ RVInstruction::operator std::string() {
 
             break;
 
-        case OP_FLW:
-            if (func3 == FUNC3_FLW)
-                s = std::format("FL.W {}, {}({})", fregister_names[rd], immediate, register_names[rs1]);
-            
-            else
-                s = "Invalid";
-            
+        case OP_FL:
+            switch (func3) {
+                case FUNC3_FLW:
+                    s = std::format("FL.W {}, {}({})", fregister_names[rd], immediate, register_names[rs1]);
+                    break;
+                
+                case FUNC3_FLD:
+                    s = std::format("FL.D {}, {}({})", fregister_names[rd], immediate, register_names[rs1]);
+                    break;
+                
+                default:
+                    s = "Invalid";
+                    break;
+            }
             break;
         
-        case OP_FSW:
-            if (func3 == FUNC3_FSW)
-                s = std::format("FS.W {}, {}({})", fregister_names[rd], immediate, register_names[rs1]);
-            
-            else
-                s = "Invalid";
-            
+        case OP_FS:
+            switch (func3) {
+                case FUNC3_FSW:
+                    s = std::format("FS.W {}, {}({})", fregister_names[rd], immediate, register_names[rs1]);
+                    break;
+                
+                case FUNC3_FSD:
+                    s = std::format("FS.D {}, {}({})", fregister_names[rd], immediate, register_names[rs1]);
+                    break;
+                
+                default:
+                    s = "Invalid";
+                    break;
+            }
             break;
-        
-        case OP_FMADD_S:
-            if ((func7 & FUNC7_FUSED_MASK) == FMT_S)
-                s = std::format("FMADD.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
-            
-            else
-                s = "Invalid";
-            
+        case OP_FMADD:
+            switch (fmt) {
+                case FMT_S:
+                    s = std::format("FMADD.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+                    break;
+                
+                case FMT_D:
+                    s = std::format("FMADD.D {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+                    break;
+                
+                default:
+                    s = "Invalid";
+                    break;
+            }
             break;
 
-        case OP_FMSUB_S:
-            if ((func7 & FUNC7_FUSED_MASK) == FMT_S)
-                s = std::format("FMSUB.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+        case OP_FMSUB:
+            switch (fmt) {
+                case FMT_S:
+                    s = std::format("FMSUB.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+                    break;
+                
+                case FMT_D:
+                    s = std::format("FMSUB.D {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+                    break;
+                
+                default:
+                    s = "Invalid";
+                    break;
+            }
+            break;
             
-            else
-                s = "Invalid";
-            
+        case OP_FNMSUB:
+            switch (fmt) {
+                case FMT_S:
+                    s = std::format("FNMSUB.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+                    break;
+                
+                case FMT_D:
+                    s = std::format("FNMSUB.D {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+                    break;
+                
+                default:
+                    s = "Invalid";
+                    break;
+            }
             break;
         
-        case OP_FNMSUB_S:
-            if ((func7 & FUNC7_FUSED_MASK) == FMT_S)
-                s = std::format("FNMSUB.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
-            
-            else
-                s = "Invalid";
-            
-            break;
-        
-        case OP_FNMADD_S:
-            if ((func7 & FUNC7_FUSED_MASK) == FMT_S)
-                s = std::format("FNMADD.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
-            
-            else
-                s = "Invalid";
-            
+        case OP_FNMADD:
+            switch (fmt) {
+                case FMT_S:
+                    s = std::format("FNMADD.S {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+                    break;
+                
+                case FMT_D:
+                    s = std::format("FNMADD.D {}, {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2], fregister_names[func7 >> 2]);
+                    break;
+                
+                default:
+                    s = "Invalid";
+                    break;
+            }
             break;
         
         case OP_FLOAT:
-            switch (func7) {
-                case FUNC7_FADD_S:
-                    s = std::format("FADD.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+            if (fmt != FMT_S && fmt != FMT_D) {
+                s = "Invalid";
+                break;
+            }
+
+            switch (func7 >> 2) {
+                case FUNC7_FADD:
+                    if (fmt == FMT_S)
+                        s = std::format("FADD.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                    else
+                        s = std::format("FADD.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                     break;
                 
-                case FUNC7_FSUB_S:
-                    s = std::format("FSUB.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                case FUNC7_FSUB:
+                    if (fmt == FMT_S)
+                        s = std::format("FSUB.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                    else
+                        s = std::format("FSUB.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                     break;
                 
-                case FUNC7_FMUL_S:
-                    s = std::format("FMUL.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                case FUNC7_FMUL:
+                    if (fmt == FMT_S)
+                        s = std::format("FMUL.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                    else
+                        s = std::format("FMUL.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                     break;
                 
-                case FUNC7_FDIV_S:
-                    s = std::format("FDIV.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                case FUNC7_FDIV:
+                    if (fmt == FMT_S)
+                        s = std::format("FDIV.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                    else
+                        s = std::format("FDIV.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                     break;
                 
-                case FUNC7_FSQRT_S:
-                    if (rs2 == RS2_FSQRT_S)
-                        s = std::format("FSQRT.S {}, {}", fregister_names[rd], fregister_names[rs1]);
+                case FUNC7_FSQRT:
+                    if (rs2 == RS2_FSQRT) {
+                        if (fmt == FMT_S)
+                            s = std::format("FSQRT.S {}, {}", fregister_names[rd], fregister_names[rs1]);
+                        else
+                            s = std::format("FSQRT.D {}, {}", fregister_names[rd], fregister_names[rs1]);
+                    }
                     
                     else
                         s = "Invalid";
@@ -582,16 +644,25 @@ RVInstruction::operator std::string() {
                 
                 case FUNC7_FSGNJ:
                     switch (func3) {
-                        case FUNC3_FSGNJ_S:
-                            s = std::format("FSGNJ.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                        case FUNC3_FSGNJ:
+                            if (fmt == FMT_S)
+                                s = std::format("FSGNJ.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            else
+                                s = std::format("FSGNJ.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                             break;
                         
-                        case FUNC3_FSGNJN_S:
-                            s = std::format("FSGNJN.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                        case FUNC3_FSGNJN:
+                            if (fmt == FMT_S)
+                                s = std::format("FSGNJN.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            else
+                                s = std::format("FSGNJN.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                             break;
                         
-                        case FUNC3_FSGNJX_S:
-                            s = std::format("FSGNJX.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                        case FUNC3_FSGNJX:
+                            if (fmt == FMT_S)
+                                s = std::format("FSGNJX.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            else
+                                s = std::format("FSGNJX.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                             break;
                         
                         default:
@@ -602,12 +673,18 @@ RVInstruction::operator std::string() {
                 
                 case FUNC7_FMIN_FMAX:
                     switch (func3) {
-                        case FUNC3_FMIN_S:
-                            s = std::format("FMIN.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                        case FUNC3_FMIN:
+                            if (fmt == FMT_S)
+                                s = std::format("FMIN.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            else
+                                s = std::format("FMIN.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                             break;
                         
-                        case FUNC3_FMAX_S:
-                            s = std::format("FMAX.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                        case FUNC3_FMAX:
+                            if (fmt == FMT_S)
+                                s = std::format("FMAX.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            else
+                                s = std::format("FMAX.D {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
                             break;
                         
                         default:
@@ -619,11 +696,11 @@ RVInstruction::operator std::string() {
                 case FUNC7_FCVT_W:
                     switch (rs2) {
                         case RS2_FCVT_W_S:
-                            s = std::format("FCVT.W.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            s = std::format("FCVT.W.S {}, {}", register_names[rd], fregister_names[rs1]);
                             break;
                         
                         case RS2_FCVT_WU_S:
-                            s = std::format("FCVT.WU.S {}, {}, {}", fregister_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            s = std::format("FCVT.WU.S {}, {}", register_names[rd], fregister_names[rs1]);
                             break;
                         
                         default:
@@ -632,73 +709,127 @@ RVInstruction::operator std::string() {
                     }
                     break;
                 
-                case FUNC7_FMV_X_W_FCLASS:
-                    if (rs2 == RS2_FMV_X_W_FCLASS) {
-                        switch (func3) {
-                            case FUNC3_FMV_X_W:
+                case FUNC7_FMV_X_FCLASS:
+                    switch (func3) {
+                        case FUNC3_FMV_X_W:
+                            if (rs2 == RS2_FMV_X_W)
                                 s = std::format("FMV.X.W {}, {}", register_names[rd], fregister_names[rs1]);
-                                break;
                             
-                            case FUNC3_FCLASS_S:
-                                s = std::format("FCLASS {}, {}", fregister_names[rd], fregister_names[rs1]);
-                                break;
-                            
-                            default:
+                            else
                                 s = "Invalid";
+                            
+                            break;
+                        
+                        case FUNC3_FCLASS:
+                            if (rs2 == RS2_FCLASS) {
+                                switch (fmt) {
+                                    case FMT_S:
+                                        s = std::format("FCLASS.S {}, {}", register_names[rd], fregister_names[rs1]);
+                                        break;
+                                    
+                                    case FMT_D:
+                                        s = std::format("FCLASS.D {}, {}", register_names[rd], fregister_names[rs1]);
+                                        break;
+                                    
+                                    default:
+                                        s = "Invalid";
+                                        break;
+                                }
                                 break;
-                        }
-                        break;
+                            
+                            } else
+                                s = "Invalid";
+                            
+                            break;
+                        
+                        default:
+                            s = "Invalid";
+                            break;
                     }
+                    break;
+                
+                case FUNC7_FCOMPARE:
+                    switch (func3) {
+                        case FUNC3_FEQ:
+                            if (fmt == FMT_S)
+                                s = std::format("FEQ.S {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            
+                            else
+                                s = std::format("FEQ.D {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            
+                            break;
+                        
+                        case FUNC3_FLT:
+                            if (fmt == FMT_S)
+                                s = std::format("FLT.S {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            
+                            else
+                                s = std::format("FLT.D {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            
+                            break;
+                        
+                        case FUNC3_FLE:
+                            if (fmt == FMT_S)
+                                s = std::format("FLE.S {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            
+                            else
+                                s = std::format("FLE.D {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
+                            
+                            break;
+                        
+                        default:
+                            s = "Invalid";
+                            break;
+                    }
+                    break;
+                
+                case FUNC7_FCVT:
+                    switch (rs2) {
+                        case RS2_FCVT_W:
+                            if (fmt == FMT_S)
+                                s = std::format("FCVT.S.W {}, {}", fregister_names[rd], register_names[rs1]);
+                            
+                            else
+                                s = std::format("FCVT.D.W {}, {}", fregister_names[rd], register_names[rs1]);
+
+                            break;
+                        
+                        case RS2_FCVT_WU:
+                            if (fmt == FMT_S)
+                                s = std::format("FCVT.S.WU {}, {}", fregister_names[rd], register_names[rs1]);
+                            
+                            else
+                                s = std::format("FCVT.D.WU {}, {}", fregister_names[rd], register_names[rs1]);
+                            
+                            break;
+                        
+                        default:
+                            s = "Invalid";
+                            break;
+                    }
+                    break;
+                
+                case FUNC7_FMV_W_X:
+                    if (func3 == FUNC3_FMV_W_X && rs2 == RS2_FMV_W_X)
+                        s = std::format("FMV.W.X {}, {}", fregister_names[rd], register_names[rs1]);
+                    
                     else
                         s = "Invalid";
                     
                     break;
                 
-                case FUNC7_FLOAT_EQU:
-                    switch (func3) {
-                        case FUNC3_FEQ_S:
-                            s = std::format("FEQ.S {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
-                            break;
+                case FUNC7_FCVT_D:
+                    if (rs2 == RS2_FCVT_S_D && fmt == FMT_S)
+                        s = std::format("FCVT.S.D {}, {}", fregister_names[rd], fregister_names[rs1]);
+                    
+                    else if (rs2 == RS2_FCVT_D_S && fmt == FMT_D)
+                        s = std::format("FCVT.D.S {}, {}", fregister_names[rd], fregister_names[rs1]);
+                    
+                    else
+                        s = "Invalid";
                         
-                        case FUNC3_FLT_S:
-                            s = std::format("FLT.S {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
-                            break;
-                        
-                        case FUNC3_FLE_S:
-                            s = std::format("FLE.S {}, {}, {}", register_names[rd], fregister_names[rs1], fregister_names[rs2]);
-                            break;
-                        
-                        default:
-                            s = "Invalid";
-                            break;
-                    }
-                    break;
-                
-                case FUNC7_FCVT_S:
-                    switch (rs2) {
-                        case RS2_FCVT_S_W:
-                            s = std::format("FCVT.S.W {}, {}", fregister_names[rd], fregister_names[rs1]);
-                            break;
-                        
-                        case RS2_FCVT_S_WU:
-                            s = std::format("FCVT.S.WU {}, {}", fregister_names[rd], fregister_names[rs1]);
-                            break;
-                        
-                        default:
-                            s = "Invalid";
-                            break;
-                    }
                     break;
 
-                case FUNC7_FMV_W_X:
-                    if ((rs2 == RS2_FMV_W_X) && (func3 == FUNC3_FMV_W_X))
-                        s = std::format("FMV.W.X {}, {}", register_names[rd], fregister_names[rs1]);
-                    
-                    else
-                        s = "Invalid";
-                    
-                    break;
-                
                 default:
                     s = "Invalid";
                     break;
@@ -864,7 +995,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
         case OP_MATH_IMMEDIATE:
         case OP_FENCE:
         case OP_SYSTEM:
-        case OP_FLW:
+        case OP_FL:
             rv_inst.rd = rd;
             rv_inst.func3 = func3;
             rv_inst.rs1 = rs1;
@@ -874,10 +1005,10 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
         
         case OP_MATH:
         case OP_ATOMIC:
-        case OP_FMADD_S:
-        case OP_FMSUB_S:
-        case OP_FNMSUB_S:
-        case OP_FNMADD_S:
+        case OP_FMADD:
+        case OP_FMSUB:
+        case OP_FNMSUB:
+        case OP_FNMADD:
         case OP_FLOAT:
             rv_inst.rd = rd;
             rv_inst.func3 = func3;
@@ -886,7 +1017,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv_inst.func7 = func7;
             break;
         
-        case OP_FSW:
+        case OP_FS:
             rv_inst.func3 = func3;
             rv_inst.rs1 = rs1;
             rv_inst.rs2 = rs2;
