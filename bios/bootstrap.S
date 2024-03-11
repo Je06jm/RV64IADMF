@@ -2,21 +2,28 @@
 
 .globl _start
 .extern putc
-.extern bios_main
+.extern main
 .extern printf
 
 _start:
     li t0, 1
     la sp, stack_top
-    jal ra, bios_main
+
+    li a0, 1
+    la a1, argv
+    call main
+
+    addi sp, sp, -4
+    sw a0, (sp)
 
     li a0, 0
     call putc
 
-    la a0, ret_error
-    call printf
-.loop:
-    j .loop
+    lw a1, (sp)
+    add sp, sp, 4
+
+    li a0, -1
+    ecall
 
 .text
 
@@ -31,7 +38,12 @@ machine_break:
     ret
 
 .data
-ret_error: .string "bios_main has returned\n"
+
+.align 4
+argv_0: .string "bios.elf"
+
+.align 4
+argv: .word argv_0, 0
 
 .bss
 
