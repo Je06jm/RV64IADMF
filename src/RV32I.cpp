@@ -696,11 +696,19 @@ RVInstruction::operator std::string() {
                 case FUNC7_FCVT_W:
                     switch (rs2) {
                         case RS2_FCVT_W_S:
-                            s = std::format("FCVT.W.S {}, {}", register_names[rd], fregister_names[rs1]);
+                            if (fmt == FMT_S)
+                                s = std::format("FCVT.W.S {}, {}", register_names[rd], fregister_names[rs1]);
+                            else
+                                s = std::format("FCVT.W.D {}, {}", register_names[rd], fregister_names[rs1]);
+                            
                             break;
                         
                         case RS2_FCVT_WU_S:
-                            s = std::format("FCVT.WU.S {}, {}", register_names[rd], fregister_names[rs1]);
+                            if (fmt == FMT_S)
+                                s = std::format("FCVT.WU.S {}, {}", register_names[rd], fregister_names[rs1]);
+                            else
+                                s = std::format("FCVT.WU.D {}, {}", register_names[rd], fregister_names[rs1]);
+
                             break;
                         
                         default:

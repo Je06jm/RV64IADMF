@@ -117,9 +117,10 @@ void printf(const char* fmt, ...) {
                     break;
                 }
                 case 'f': {
-                    machine_break();
                     int32_t num = va_arg(args, double) * 100.0;
-                    print_num(num, 10, true, false);
+                    print_num(num / 100, 10, true, false);
+                    putc('.');
+                    print_num(num % 100, 10, true, false);
                     break;
                 }
                 case 'c': {
@@ -148,9 +149,9 @@ void printf(const char* fmt, ...) {
 }
 
 void bios_main() {
-    float aa = 1.2;
-    float bb = 2.3;
-    float cc = aa + bb;
+    double aa = 1.2;
+    double bb = 2.3;
+    double cc = aa + bb;
     printf("Hello world! %f\n", cc);
     printf("%i\n", 42);
     printf("0x%x\n", 0xdeadbeef);

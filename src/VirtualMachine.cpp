@@ -1394,14 +1394,38 @@ bool VirtualMachine::Step(uint32_t steps) {
                         switch (instr.rs2) {
                             case RVInstruction::RS2_FCVT_W_S:
                                 if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-                                regs[instr.rd] = AsUnsigned(static_cast<int32_t>(fregs[instr.rs1].f));
+                                switch (instr.fmt) {
+                                    case RVInstruction::FMT_S:
+                                        regs[instr.rd] = AsUnsigned(static_cast<int32_t>(fregs[instr.rs1].f));
+                                        break;
+                                    
+                                    case RVInstruction::FMT_D:
+                                        regs[instr.rd] = AsUnsigned(static_cast<int32_t>(fregs[instr.rs1].d));
+                                        break;
+                                    
+                                    default:
+                                        InvalidInstruction();
+                                        break;
+                                }
                                 CheckFloatErrors();
                                 ChangeRoundingMode();
                                 break;
                             
                             case RVInstruction::RS2_FCVT_WU_S:
                                 if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-                                regs[instr.rd] = static_cast<uint32_t>(fregs[instr.rs1].f);
+                                switch (instr.fmt) {
+                                    case RVInstruction::FMT_S:
+                                        regs[instr.rd] = AsUnsigned(static_cast<uint32_t>(fregs[instr.rs1].f));
+                                        break;
+                                    
+                                    case RVInstruction::FMT_D:
+                                        regs[instr.rd] = AsUnsigned(static_cast<uint32_t>(fregs[instr.rs1].d));
+                                        break;
+                                    
+                                    default:
+                                        InvalidInstruction();
+                                        break;
+                                }
                                 CheckFloatErrors();
                                 ChangeRoundingMode();
                                 break;
@@ -1648,7 +1672,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                             case RVInstruction::RS2_FCVT_D_S:
                                 if (instr.fmt != RVInstruction::FMT_D) InvalidInstruction();
                                 if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-                                fregs[instr.rd].d = fregs[instr.rs1].d;
+                                fregs[instr.rd].d = fregs[instr.rs1].f;
                                 CheckFloatErrors();
                                 ChangeRoundingMode();
                                 break;
