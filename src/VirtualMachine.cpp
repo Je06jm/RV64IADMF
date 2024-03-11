@@ -775,7 +775,7 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                         switch (instr.immediate) {
                             case RVInstruction::IMM_ECALL:
-                                if (regs[REG_A0] >= ecall_handlers.size())
+                                if (!ecall_handlers.contains(regs[REG_A0]))
                                     EmptyECallHandler(memory, regs, fregs);
                                 
                                 else
@@ -1784,8 +1784,8 @@ void VirtualMachine::UpdateTime() {
     }
 }
 
-void VirtualMachine::EmptyECallHandler(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&) {
+void VirtualMachine::EmptyECallHandler(Memory&, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&) {
     throw std::runtime_error(std::format("Unknown ECall handler: {}", regs[REG_A0]));
 }
 
-std::vector<VirtualMachine::ECallHandler> VirtualMachine::ecall_handlers;
+std::unordered_map<uint32_t, VirtualMachine::ECallHandler> VirtualMachine::ecall_handlers;

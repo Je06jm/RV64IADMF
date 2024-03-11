@@ -315,11 +315,10 @@ public:
 private:
     static void EmptyECallHandler(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&);
 
-    static std::vector<ECallHandler> ecall_handlers;
+    static std::unordered_map<uint32_t, ECallHandler> ecall_handlers;
 
 public:
     inline static void RegisterECall(uint32_t handler_index, ECallHandler handler) {
-        if (handler_index >= ecall_handlers.size()) ecall_handlers.resize(handler_index + 1, EmptyECallHandler);
         ecall_handlers[handler_index] = handler;
     }
 };
