@@ -3,7 +3,8 @@
 
 #include <cstdint>
 
-constexpr uint32_t EBREAK_PRINT = 0;
+constexpr uint32_t EBREAK_COUT = 0;
+constexpr uint32_t EBREAK_CIN = 1;
 
 void RegisterBuiltinEBreaks();
 
