@@ -5,7 +5,7 @@
 #include "Memory.hpp"
 #include "VirtualMachine.hpp"
 #include "RV32I.hpp"
-#include "EBreaks.hpp"
+#include "ECalls.hpp"
 
 #include "GUIMemoryViewer.hpp"
 #include "GUIAssembly.hpp"
@@ -34,7 +34,7 @@ int main(int argc, const char** argv) {
     }
 
     RVInstruction::SetupCSRNames();
-    RegisterBuiltinEBreaks();
+    RegisterBuiltinECalls();
 
     Window window("RV32IMF", 800, 600);
 

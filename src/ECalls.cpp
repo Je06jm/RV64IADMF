@@ -1,4 +1,4 @@
-#include "EBreaks.hpp"
+#include "ECalls.hpp"
 
 #include "VirtualMachine.hpp"
 
@@ -7,7 +7,7 @@
 
 using VM = VirtualMachine;
 
-void BuiltinEBreakCOut(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
+void BuiltinECallCOut(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
     std::string str = "";
 
     for (uint32_t addr = regs[VM::REG_A1], i = 0; i < regs[VM::REG_A2]; addr++, i++) {
@@ -18,7 +18,7 @@ void BuiltinEBreakCOut(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>&
     std::cout << str << std::flush;
 }
 
-void BuiltinEBreakCIn(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
+void BuiltinECallCIn(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
     std::string str = "";
 
     if (!std::getline(std::cin, str)) {
@@ -34,7 +34,7 @@ void BuiltinEBreakCIn(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& 
     regs[VM::REG_A0] = i;
 }
 
-void RegisterBuiltinEBreaks() {
-    VM::RegisterECall(EBREAK_COUT, BuiltinEBreakCOut);
-    VM::RegisterECall(EBREAK_CIN, BuiltinEBreakCIn);
+void RegisterBuiltinECalls() {
+    VM::RegisterECall(ECALL_COUT, BuiltinECallCOut);
+    VM::RegisterECall(ECALL_CIN, BuiltinECallCIn);
 }
