@@ -161,7 +161,7 @@ void RVInstruction::SetupCSRNames() {
 RVInstruction::operator std::string() {
     std::string s;
 
-    struct SU32 {
+    union SU32 {
         uint32_t u;
         int32_t s;
     };
@@ -178,13 +178,17 @@ RVInstruction::operator std::string() {
     auto s_frs1 = fregister_names[rs1];
     auto s_frd = fregister_names[rd];
 
+    std::string s_imm;
+    if (imm.s < 0) s_imm = std::format("{} ({})", imm.s, imm.u);
+    else s_imm = std::format("{}", imm.u);
+
     switch (type) {
         case Type::LUI:
-            s = std::format("LUI, {} {} ({})", s_rd, imm.u, imm.s);
+            s = std::format("LUI {}, {}", s_rd, s_imm);
             break;
         
         case Type::AUIPC:
-            s = std::format("AUIPC {}, {} ({})", s_rd, imm.u, imm.s);
+            s = std::format("AUIPC {}, {}", s_rd, s_imm);
             break;
         
         case Type::JAL:
@@ -220,59 +224,59 @@ RVInstruction::operator std::string() {
             break;
         
         case Type::LB:
-            s = std::format("LB {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("LB {}, {}({})", s_rd, imm.s, s_rs1);
             break;
         
         case Type::LH:
-            s = std::format("LH {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("LH {}, {}({})", s_rd, imm.s, s_rs1);
             break;
         
         case Type::LW:
-            s = std::format("LW {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("LW {}, {}({})", s_rd, imm.s, s_rs1);
             break;
         
         case Type::LBU:
-            s = std::format("LBU {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("LBU {}, {}({})", s_rd, imm.s, s_rs1);
             break;
         
         case Type::LHU:
-            s = std::format("LHU {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("LHU {}, {}({})", s_rd, imm.s, s_rs1);
             break;
         
         case Type::SB:
-            s = std::format("SB {}, {}, {} ({})", s_rs1, s_rs2, imm.u, imm.s);
+            s = std::format("SB {}, {}({})", s_rs2, imm.s, s_rs1);
             break;
         
         case Type::SH:
-            s = std::format("SH {}, {}, {} ({})", s_rs1, s_rs2, imm.u, imm.s);
+            s = std::format("SH {}, {}({})", s_rs2, imm.s, s_rs1);
             break;
         
         case Type::SW:
-            s = std::format("SW {}, {}, {} ({})", s_rs1, s_rs2, imm.u, imm.s);
+            s = std::format("SW {}, {}({})", s_rs2, imm.s, s_rs1);
             break;
         
         case Type::ADDI:
-            s = std::format("ADDI {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("ADDI {}, {}, {}", s_rd, s_rs1, s_imm);
             break;
         
         case Type::SLTI:
-            s = std::format("SLTI {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("SLTI {}, {}, {}", s_rd, s_rs1, s_imm);
             break;
         
         case Type::SLTIU:
-            s = std::format("SLTIU {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("SLTIU {}, {}, {}", s_rd, s_rs1, s_imm);
             break;
         
         case Type::XORI:
-            s = std::format("XORI {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("XORI {}, {}, {}", s_rd, s_rs1, s_imm);
             break;
         
         case Type::ORI:
-            s = std::format("ORI {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("ORI {}, {}, {}", s_rd, s_rs1, s_imm);
             break;
         
         case Type::ANDI:
-            s = std::format("ANDI {}, {}, {} ({})", s_rd, s_rs1, imm.u, imm.s);
+            s = std::format("ANDI {}, {}, {}", s_rd, s_rs1, s_imm);
             break;
         
         case Type::SLLI:
@@ -692,8 +696,6 @@ RVInstruction::operator std::string() {
             break;
     }
 
-    s = "operator std::string() not implemented";
-
     return s;
 }
 
@@ -1007,6 +1009,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv.immediate |= iw.J.imm1 << 11;
             rv.immediate |= iw.J.imm2 << 12;
             rv.immediate |= iw.J.imm3 << 20;
+            sign_extend_at = 20;
             break;
         
         case OP_JALR:
@@ -1016,15 +1019,17 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv.rd = iw.I.rd;
             rv.rs1 = iw.I.rs1;
             rv.immediate = iw.I.imm;
+            sign_extend_at = 11;
             break;
         
         case OP_BRANCH:
             rv.rs1 = iw.B.rs1;
             rv.rs2 = iw.B.rs2;
-            rv.immediate = iw.B.imm0 << 11;
-            rv.immediate |= iw.B.imm1 << 1;
-            rv.immediate |= iw.B.imm2 << 5;
+            rv.immediate = iw.B.imm0 << 1;
+            rv.immediate |= iw.B.imm1 << 5;
+            rv.immediate |= iw.B.imm2 << 11;
             rv.immediate |= iw.B.imm3 << 12;
+            sign_extend_at = 12;
 
             switch (iw.S.funct3) {
                 case FUNCT3_BEQ:
@@ -1060,6 +1065,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv.rd = iw.I.rd;
             rv.rs1 = iw.I.rs1;
             rv.immediate = iw.I.imm;
+            sign_extend_at = 11;
 
             switch (iw.I.funct3) {
                 case FUNCT3_LB:
@@ -1092,6 +1098,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv.rs2 = iw.S.rs2;
             rv.immediate = iw.S.imm0;
             rv.immediate |= iw.S.imm1 << 5;
+            sign_extend_at = 11;
 
             switch (iw.S.funct3) {
                 case FUNCT3_SB:
@@ -1115,6 +1122,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv.rd = iw.I.rd;
             rv.rs1 = iw.I.rs1;
             rv.immediate = iw.I.imm;
+            sign_extend_at = 11;
             
             switch (iw.I.funct3) {
                 case FUNCT3_ADDI:
@@ -1144,9 +1152,11 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
                 case FUNCT3_SLLI:
                     if ((rv.immediate >> 5) != 0) break;
                     rv.type = RVInstruction::Type::SLLI;
+                    rv.rs2 = iw.R.rs2;
                     break;
                 
                 case FUNCT3_SHIFT_RIGHT_IMMEDIATE:
+                    rv.rs2 = iw.R.rs2;
                     switch (rv.immediate >> 5) {
                         case FUNCT7_SRLI:
                             rv.type = RVInstruction::Type::SRLI;
@@ -1314,6 +1324,10 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             break;
         
         case OP_SYSTEM:
+            rv.rd = iw.R.rd;
+            rv.rs1 = iw.R.rs1;
+            rv.rs2 = iw.R.rs2;
+
             switch (iw.I.funct3) {
                 case FUNCT3_SYSTEM:
                     if (iw.I.rd != RD_SYSTEM || iw.I.funct3 != FUNCT3_SYSTEM) break;
@@ -1432,6 +1446,10 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
         case OP_ATOMIC:
             if (iw.R.funct3 != FUNCT3_ATOMIC) break;
 
+            rv.rd = iw.R.rd;
+            rv.rs1 = iw.R.rs1;
+            rv.rs2 = iw.R.rs2;
+
             switch (iw.R.funct7 & FUNCT7_ATOMIC_MASK) {
                 case FUNCT7_LR_W:
                     if (iw.R.rs2 != RS2_LR_W) break;
@@ -1485,7 +1503,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
 
             switch (iw.R.funct7 & FUNCT7_ATOMIC_MASK) {
                 case FUNCT7_SC_W:
-                    rv.type = RVInstruction::Type::SC_W;
+                    break;
 
                 case FUNCT7_AMOSWAP_W:
                 case FUNCT7_AMOADD_W:
@@ -1510,6 +1528,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv.rd = iw.I.rd;
             rv.rs1 = iw.I.rs1;
             rv.immediate = iw.I.imm;
+            sign_extend_at = 11;
 
             switch (iw.I.funct3) {
                 case FUNCT3_FLW:
@@ -1530,6 +1549,7 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             rv.rs2 = iw.S.rs2;
             rv.immediate = iw.S.imm0;
             rv.immediate |= iw.S.imm1 << 5;
+            sign_extend_at = 11;
 
             switch (iw.S.funct3) {
                 case FUNCT3_FSW:
@@ -1974,6 +1994,11 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
 
         default:
             break;
+    }
+
+    if (sign_extend_at > 0) {
+        uint32_t sign = -1U << sign_extend_at;
+        if (rv.immediate & (1U << sign_extend_at)) rv.immediate |= sign;
     }
 
     return rv;

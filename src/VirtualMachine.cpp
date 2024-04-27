@@ -71,6 +71,7 @@ bool VirtualMachine::TLBEntry::CheckValid() {
     if (!IsFlagsSet(FLAG_VALID)) {
         // Raise exception
     }
+    return true;
 }
 
 bool VirtualMachine::TLBEntry::CheckExecution(bool as_user) {
@@ -346,7 +347,50 @@ bool VirtualMachine::Step(uint32_t steps) {
         return v.u;
     };
 
+    auto ClassF32 = [](Float value, bool* is_inf, bool* is_nan, bool* is_qnan, bool* is_subnormal, bool* is_zero, bool* is_neg) {
+        // TODO This might not work as intended
+        uint8_t sign = value.u32 >> 31;
+        uint8_t exp = (value.u32 >> 23) & 0xff;
+        uint32_t frac = value.u32 & 0x7fffff;
+        
+        if (is_inf) *is_inf = exp == 0xff && frac == 0;
+        if (is_nan) *is_nan = exp == 0xff && frac != 0 && !(frac & 0x400000);
+        if (is_qnan) *is_qnan = exp == 0xff && (frac & 0x400000);
+        if (is_subnormal) *is_subnormal = exp == 0 && frac != 0;
+        if (is_zero) *is_zero = exp == 0 && frac == 0;
+        if (is_neg) *is_neg = sign != 0;
+    };
+
+    auto ClassF64 = [](Float value, bool* is_inf, bool* is_nan, bool* is_qnan, bool* is_subnormal, bool* is_zero, bool* is_neg) {
+        // TODO This might not work as intended
+        uint8_t sign = value.u64 >> 63;
+        uint16_t exp = (value.u64 >> 52) & 0x7ff;
+        uint64_t frac = value.u64 & 0xfffffffffffff;
+        
+        if (is_inf) *is_inf = exp == 0x7ff && frac == 0;
+        if (is_nan) *is_nan = exp == 0x7ff && frac != 0 && !(frac & 0x8000000000000);
+        if (is_qnan) *is_qnan = exp == 0x7ff && (frac & 0x8000000000000);
+        if (is_subnormal) *is_subnormal = exp == 0 && frac != 0;
+        if (is_zero) *is_zero = exp == 0 && frac == 0;
+        if (is_neg) *is_neg = sign != 0;
+    };
+
+    auto SetFloatFlags = [&](bool invalid_op, bool div_by_zero, bool overflow, bool underflow, bool inexact) {
+        if (invalid_op) csrs[CSR_FCSR] |= CSR_FCSR_NV;
+        if (div_by_zero) csrs[CSR_FCSR] |= CSR_FCSR_DZ;
+        if (overflow) csrs[CSR_FCSR] |= CSR_FCSR_OF;
+        if (underflow) csrs[CSR_FCSR] |= CSR_FCSR_UF;
+        if (inexact) csrs[CSR_FCSR] |= CSR_FCSR_NX;
+    };
+
     ticks += steps;
+
+    using Type = RVInstruction::Type;
+
+    constexpr uint64_t RV_F32_NAN = 0xffffffff7fc00000;
+    constexpr uint64_t RV_F32_QNAN = 0xffffffffffc00000;
+    constexpr uint64_t RV_F64_NAN = 0x7ff0000000000000;
+    constexpr uint64_t RV_F64_QNAN = 0xfff0000000000000;
     
     for (uint32_t i = 0; i < steps && running; i++) {
         if (pc & 0b11)
@@ -354,1357 +398,1379 @@ bool VirtualMachine::Step(uint32_t steps) {
         
         auto instr = RVInstruction::FromUInt32(memory.Read32(pc));
 
-        switch (instr.opcode) {
-            case RVInstruction::OP_LUI:
+        switch (instr.type) {
+            case Type::LUI:
                 regs[instr.rd] = instr.immediate;
                 break;
-
-            case RVInstruction::OP_AUIPC:
+            
+            case Type::AUIPC:
                 regs[instr.rd] = pc + instr.immediate;
                 break;
             
-            case RVInstruction::OP_JAL: {
+            case Type::JAL: {
                 uint32_t next_pc = pc + 4;
-                pc += SignExtend(instr.immediate, 20);
+                pc += instr.immediate;
                 regs[instr.rd] = next_pc;
                 break;
             }
             
-            case RVInstruction::OP_JALR: {
-                if (instr.func3 != RVInstruction::FUNC3_JALR) InvalidInstruction();
-
-                uint32_t next_pc = pc + 4; 
-                pc = (regs[instr.rs1] + SignExtend(instr.immediate, 11)) & 0xfffffffe;
+            case Type::JALR: {
+                uint32_t next_pc = pc + 4;
+                pc = (regs[instr.rs1] + instr.immediate) & 0xfffffffe;
                 regs[instr.rd] = next_pc;
                 break;
             }
             
-            case RVInstruction::OP_BRANCH:
-                switch (instr.func3) {
-                    case RVInstruction::FUNC3_BEQ:
-                        if (regs[instr.rs1] == regs[instr.rs2])
-                            pc += SignExtend(instr.immediate, 12);
-                        
-                        else
-                            pc += 4;
-                        
-                        break;
-                    
-                    case RVInstruction::FUNC3_BNE:
-                        if (regs[instr.rs1] != regs[instr.rs2])
-                            pc += SignExtend(instr.immediate, 12);
-                        
-                        else
-                            pc += 4;
-                        
-                        break;
-                    
-                    case RVInstruction::FUNC3_BLT:
-                        if (AsSigned(regs[instr.rs1]) < AsSigned(regs[instr.rs2]))
-                            pc += SignExtend(instr.immediate, 12);
-                        
-                        else
-                            pc += 4;
-                        
-                        break;
-                    
-                    case RVInstruction::FUNC3_BGE:
-                        if (AsSigned(regs[instr.rs1]) > AsSigned(regs[instr.rs2]))
-                            pc += SignExtend(instr.immediate, 12);
-                        
-                        else
-                            pc += 4;
-                        
-                        break;
-                    
-                    case RVInstruction::FUNC3_BLTU:
-                        if (regs[instr.rs1] < regs[instr.rs2])
-                            pc += SignExtend(instr.immediate, 12);
-                        
-                        else
-                            pc += 4;
-                        
-                        break;
-                    
-                    case RVInstruction::FUNC3_BGEU:
-                        if (regs[instr.rs1] > regs[instr.rs2])
-                            pc += SignExtend(instr.immediate, 12);
-                        
-                        else
-                            pc += 4;
-                        
-                        break;
-                    
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-                break;
-            
-            case RVInstruction::OP_LOAD: {
-                uint32_t address = regs[instr.rs1] + SignExtend(instr.immediate, 11);
-
-                switch (instr.func3) {
-                    case RVInstruction::FUNC3_LB:
-                        regs[instr.rd] = SignExtend(memory.Read8(address), 7);
-                        break;
-                    
-                    case RVInstruction::FUNC3_LH:
-                        regs[instr.rd] = SignExtend(memory.Read16(address), 15);
-                        break;
-                    
-                    case RVInstruction::FUNC3_LW:
-                        regs[instr.rd] = memory.Read32(address);
-                        break;
-                    
-                    case RVInstruction::FUNC3_LBU:
-                        regs[instr.rd] = memory.Read8(address);
-                        break;
-                    
-                    case RVInstruction::FUNC3_LHU:
-                        regs[instr.rd] = memory.Read16(address);
-                        break;
-                    
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-                break;
-            }
-
-            case RVInstruction::OP_STORE: {
-                uint32_t address = regs[instr.rs1] + SignExtend(instr.immediate, 11);
-
-                switch (instr.func3) {
-                    case RVInstruction::FUNC3_SB:
-                        memory.Write8(address, regs[instr.rs2]);
-                        break;
-                    
-                    case RVInstruction::FUNC3_SH:
-                        memory.Write16(address, regs[instr.rs2]);
-                        break;
-                    
-                    case RVInstruction::FUNC3_SW:
-                        memory.Write32(address, regs[instr.rs2]);
-                        break;
-                    
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-                break;
-            }
-
-            case RVInstruction::OP_MATH_IMMEDIATE:
-                switch (instr.func3) {
-                    case RVInstruction::FUNC3_ADDI:
-                        regs[instr.rd] = regs[instr.rs1] + SignExtend(instr.immediate, 11);
-                        break;
-                    
-                    case RVInstruction::FUNC3_SLTI:
-                        if (AsSigned(regs[instr.rs1]) < AsSigned(SignExtend(instr.immediate, 11)))
-                            regs[instr.rd] = 1;
-
-                        else
-                            regs[instr.rd] = 0;
-                        
-                        break;
-                    
-                    case RVInstruction::FUNC3_SLTIU:
-                        if (regs[instr.rs1] < SignExtend(instr.immediate, 11))
-                            regs[instr.rd] = 1;
-                        
-                        else
-                            regs[instr.rd] = 0;
-                        
-                        break;
-                    
-                    case RVInstruction::FUNC3_XORI:
-                        regs[instr.rd] = regs[instr.rs1] ^ SignExtend(instr.immediate, 11);
-                        break;
-                    
-                    case RVInstruction::FUNC3_ORI:
-                        regs[instr.rd] = regs[instr.rs1] | SignExtend(instr.immediate, 11);
-                        break;
-                    
-                    case RVInstruction::FUNC3_ANDI:
-                        regs[instr.rd] = regs[instr.rs1] & SignExtend(instr.immediate, 11);
-                        break;
-                    
-                    case RVInstruction::FUNC3_SLLI:
-                        if (instr.func7 != RVInstruction::FUNC7_SLLI) InvalidInstruction();
-
-                        regs[instr.rd] = regs[instr.rs1] << instr.rs2;
-                        break;
-                    
-                    case RVInstruction::FUNC3_SHIFT_RIGHT_IMMEDIATE: {
-                        switch (instr.immediate >> 5) {
-                            case RVInstruction::FUNC7_SRLI:
-                                regs[instr.rd] = regs[instr.rs1] >> instr.rs2;
-                                break;
-                            
-                            case RVInstruction::FUNC7_SRAI: {
-                                int32_t value = AsSigned(regs[instr.rs1]);
-                                value >>= instr.rs2;
-                                regs[instr.rd] = AsUnsigned(value);
-                                break;
-                            }
-
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    }
-                    
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-                break;
-            
-            case RVInstruction::OP_MATH:
-                switch (instr.func3) {
-                    case RVInstruction::FUNC3_ADD_SUB_MUL:
-                        switch (instr.func7) {
-                            case RVInstruction::FUNC7_ADD:
-                                regs[instr.rd] = regs[instr.rs1] + regs[instr.rs2];
-                                break;
-                            
-                            case RVInstruction::FUNC7_SUB:
-                                regs[instr.rd] = regs[instr.rs1] - regs[instr.rs2];
-                                break;
-                            
-                            case RVInstruction::FUNC7_MUL:
-                                regs[instr.rd] = regs[instr.rs1] * regs[instr.rs2];
-                                break;
-                            
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC3_SLL_MULH:
-                        switch (instr.func7) {
-                            case RVInstruction::FUNC7_SLL:
-                                regs[instr.rd] = regs[instr.rs1] << (regs[instr.rs2] & 0x1f);
-                                break;
-                            
-                            case RVInstruction::FUNC7_MULH: {
-                                int32_t lhs = AsSigned(regs[instr.rs1]);
-                                int32_t rhs = AsSigned(regs[instr.rs2]);
-                                int32_t result = lhs * rhs;
-                                regs[instr.rd] = AsUnsigned(result);
-                                break;
-                            }
-
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC3_SLT_MULHSU:
-                        switch (instr.func7) {
-                            case RVInstruction::FUNC7_SLT:
-                                if (AsSigned(regs[instr.rs1]) < AsSigned(regs[instr.rs2]))
-                                    regs[instr.rd] = 1;
-                                
-                                else
-                                    regs[instr.rd] = 0;
-                                
-                                break;
-                            
-                            case RVInstruction::FUNC7_MULHSU: {
-                                int64_t lhs = AsSigned(regs[instr.rs1]);
-                                uint64_t rhs = regs[instr.rs2];
-                                int64_t result = lhs * rhs;
-                                regs[instr.rd] = AsUnsigned(static_cast<int32_t>(result >> 32));
-                                break;
-                            }
-
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC3_SLTU_MULHU:
-                        switch (instr.func7) {
-                            case RVInstruction::FUNC7_SLTU:
-                                if (regs[instr.rs1] < regs[instr.rs2])
-                                    regs[instr.rd] = 1;
-                                
-                                else
-                                    regs[instr.rd] = 0;
-                                
-                                break;
-                            
-                            case RVInstruction::FUNC7_MULHU: {
-                                uint64_t lhs = regs[instr.rs1];
-                                uint64_t rhs = regs[instr.rs2];
-                                uint64_t result = lhs * rhs;
-                                regs[instr.rd] = static_cast<uint32_t>(result >> 32);
-                                break;
-                            }
-
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC3_XOR_DIV:
-                        switch (instr.func7) {
-                            case RVInstruction::FUNC7_XOR:
-                                regs[instr.rd] = regs[instr.rs1] ^ regs[instr.rs2];
-                                break;
-                            
-                            case RVInstruction::FUNC7_DIV: {
-                                int32_t lhs = AsSigned(regs[instr.rs1]);
-                                int32_t rhs = AsSigned(regs[instr.rs2]);
-
-                                if (rhs == 0)
-                                    throw std::runtime_error("Div by zero is not handled yet");
-
-                                int32_t result = lhs / rhs;
-                                regs[instr.rd] = AsUnsigned(result);
-                                break;
-                            }
-
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC3_SHIFT_RIGHT_DIVU:
-                        switch (instr.func7) {
-                            case RVInstruction::FUNC7_SRL:
-                                regs[instr.rd] = regs[instr.rs1] >> (regs[instr.rs2] & 0x1f);
-                                break;
-                            
-                            case RVInstruction::FUNC7_SRA: {
-                                int32_t value = AsSigned(regs[instr.rs1]);
-                                value >>= regs[instr.rs2] & 0x1f;
-                                regs[instr.rd] = AsUnsigned(value);
-                                break;
-                            }
-
-                            case RVInstruction::FUNC7_DIVU: {
-                                uint32_t lhs = regs[instr.rs1];
-                                uint32_t rhs = regs[instr.rs2];
-
-                                if (rhs == 0)
-                                    throw std::runtime_error("Div by zero is not handled yet");
-                                
-                                uint32_t result = lhs / rhs;
-                                regs[instr.rd] = result;
-                                break;
-                            }
-
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC3_OR_REMW:
-                        switch (instr.func7) {
-                            case RVInstruction::FUNC7_OR:
-                                regs[instr.rd] = regs[instr.rs1] | regs[instr.rs2];
-                                break;
-                            
-                            case RVInstruction::FUNC7_REMW: {
-                                int32_t lhs = AsSigned(regs[instr.rs1]);
-                                int32_t rhs = AsSigned(regs[instr.rs2]);
-
-                                if (rhs == 0)
-                                    throw std::runtime_error("Div by zero is not handled yet");
-
-                                int32_t value = lhs % rhs;
-                                regs[instr.rd] = AsUnsigned(value);
-                                break;
-                            }
-
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC3_AND_REMU:
-                        switch (instr.func7) {
-                            case RVInstruction::FUNC7_AND:
-                                regs[instr.rd] = regs[instr.rs1] & regs[instr.rs2];
-                                break;
-                            
-                            case RVInstruction::FUNC7_REMU: {
-                                uint32_t lhs = regs[instr.rs1];
-                                uint32_t rhs = regs[instr.rs2];
-
-                                if (rhs == 0)
-                                    throw std::runtime_error("Div by zero is not handled yet");
-                                
-                                uint32_t value = lhs % rhs;
-                                regs[instr.rd] = value;
-                                break;
-                            }
-
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-                break;
-
-            case RVInstruction::OP_FENCE:
-                if (instr.func3 != RVInstruction::FUNC3_FENCE) InvalidInstruction();
-                break;
-            
-            case RVInstruction::OP_SYSTEM:
-                switch (instr.func3) {
-                    case RVInstruction::FUNC3_SYSTEM:
-                        if (instr.rd != RVInstruction::RD_SYSTEM) InvalidInstruction();
-
-                        switch (instr.immediate) {
-                            case RVInstruction::IMM_ECALL:
-                                if (!ecall_handlers.contains(regs[REG_A0]))
-                                    EmptyECallHandler(memory, regs, fregs);
-                                
-                                else
-                                    ecall_handlers[regs[REG_A0]](memory, regs, fregs);
-                                
-                                break;
-                            
-                            case RVInstruction::IMM_EBREAK:
-                                break;
-                            
-                            default:
-                                switch (instr.immediate) {
-                                    case RVInstruction::IMM_URET:
-                                        throw std::runtime_error("URET");
-                                        break;
-                                    
-                                    case RVInstruction::IMM_SRET:
-                                        throw std::runtime_error("SRET");
-                                        break;
-                                    
-                                    case RVInstruction::IMM_MRET:
-                                        throw std::runtime_error("MRET");
-                                        break;
-
-                                    case RVInstruction::IMM_WFI:
-                                        throw std::runtime_error("WFI");
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            }
-                            break;
-                    
-                    case RVInstruction::FUNC3_CSRRW: {
-                        uint32_t value = regs[instr.rs1];
-                        if (instr.rd != REG_ZERO)
-                            regs[instr.rd] = ReadCSR(instr.immediate);
-                        
-                        WriteCSR(instr.immediate, value);
-                        break;
-                    }
-                    
-                    case RVInstruction::FUNC3_CSRRS: {
-                        uint32_t value = regs[instr.rs1];
-                        if (instr.rd != REG_ZERO)
-                            regs[instr.rd] = ReadCSR(instr.immediate);
-                        
-                        if (instr.rs1 != REG_ZERO)
-                            WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) | value);
-
-                        break;
-                    }
-                    
-                    case RVInstruction::FUNC3_CSRRC: {
-                        uint32_t value = regs[instr.rs1];
-                        if (instr.rd != REG_ZERO)
-                            regs[instr.rd] = ReadCSR(instr.immediate);
-                        
-                        if (instr.rs1 != REG_ZERO)
-                            WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) & ~value);
-                        
-                        break;
-                    }
-                    
-                    case RVInstruction::FUNC3_CSRRWI: {
-                        uint32_t value = instr.rs1;
-                        if (instr.rd != REG_ZERO)
-                            regs[instr.rd] = ReadCSR(instr.immediate);
-                        
-                        WriteCSR(instr.immediate, value);
-                        break;
-                    }
-                    
-                    case RVInstruction::FUNC3_CSRRSI: {
-                        uint32_t value = instr.rs1;
-                        if (instr.rd != REG_ZERO)
-                            regs[instr.rd] = ReadCSR(instr.immediate);
-                        
-                        WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) | value);
-                        break;
-                    }
-                    
-                    case RVInstruction::FUNC3_CSRRCI: {
-                        uint32_t value = instr.rs1;
-                        if (instr.rd != REG_ZERO)
-                            regs[instr.rd] = ReadCSR(instr.immediate);
-                        
-                        WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) & ~value);
-                        break;
-                    }
-                    
-                    default:
-                        InvalidInstruction();
-                        break;
-
-                }
-                break;
-
-            case RVInstruction::OP_ATOMIC:
-                if (instr.func3 != RVInstruction::FUNC3_ATOMIC) InvalidInstruction();
-
-                switch (instr.func7 & RVInstruction::FUNC7_ATOMIC_MASK) {
-                    case RVInstruction::FUNC7_LR_W:
-                        if (instr.rs2 != 0) InvalidInstruction();
-                        regs[instr.rd] = memory.Read32Reserved(regs[instr.rs1], csrs[CSR_MHARTID]);
-                        break;
-                    
-                    case RVInstruction::FUNC7_SC_W:
-                        if (memory.Write32Conditional(regs[instr.rs1], regs[instr.rs2], csrs[CSR_MHARTID])) {
-                            regs[instr.rd] = 0;
-                        } else {
-                            regs[instr.rd] = 1;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC7_AMOSWAP_W:
-                        regs[instr.rd] = memory.AtomicSwap(regs[instr.rs1], regs[instr.rs2]);
-                        break;
-                    
-                    case RVInstruction::FUNC7_AMOADD_W:
-                        regs[instr.rd] = memory.AtomicAdd(regs[instr.rs1], regs[instr.rs2]);
-                        break;
-                    
-                    case RVInstruction::FUNC7_AMOAND_W:
-                        regs[instr.rd] = memory.AtomicAnd(regs[instr.rs1], regs[instr.rs2]);
-                        break;
-                    
-                    case RVInstruction::FUNC7_AMOOR_W:
-                        regs[instr.rd] = memory.AtomicOr(regs[instr.rs1], regs[instr.rs2]);
-                        break;
-                    
-                    case RVInstruction::FUNC7_AMOMAX_W: {
-                        int32_t result = AsSigned(regs[instr.rs2]);
-                        result = memory.AtomicMax(regs[instr.rs1], result);
-                        regs[instr.rd] = AsUnsigned(result);
-                        break;
-                    }
-                    
-                    case RVInstruction::FUNC7_AMOMAXU_W:
-                        regs[instr.rd] = memory.AtomicMaxU(regs[instr.rs1], regs[instr.rs2]);
-                        break;
-                    
-                    case RVInstruction::FUNC7_AMOMIN_W: {
-                        int32_t result = AsSigned(regs[instr.rs2]);
-                        result = memory.AtomicMin(regs[instr.rs1], result);
-                        regs[instr.rd] = AsUnsigned(result);
-                        break;
-                    }
-                    
-                    case RVInstruction::FUNC7_AMOMINU_W:
-                        regs[instr.rd] = memory.AtomicMinU(regs[instr.rs1], regs[instr.rs2]);
-                        break;
-                    
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-                break;
-
-            case RVInstruction::OP_FL:
-                switch (instr.func3) {
-                    case RVInstruction::FUNC3_FLW:
-                        fregs[instr.rd] = ToFloat(memory.Read32(regs[instr.rs1] + SignExtend(instr.immediate, 11)));
-                        break;
-                    
-                    case RVInstruction::FUNC3_FLD: {
-                        uint32_t address = regs[instr.rs1] + SignExtend(instr.immediate, 11);
-                        uint64_t value = memory.Read32(address);
-                        value |= static_cast<uint64_t>(memory.Read32(address + 4)) << 32;
-                        fregs[instr.rd] = ToDouble(value);
-                        break;
-                    }
-
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-                break;
-            
-            case RVInstruction::OP_FS:
-                switch (instr.func3) {
-                    case RVInstruction::FUNC3_FSW:
-                        memory.Write32(regs[instr.rs1] + SignExtend(instr.immediate, 11), ToUInt32(fregs[instr.rs2]));
-                        break;
-                    
-                    case RVInstruction::FUNC3_FSD: {
-                        uint32_t address = regs[instr.rs1] + SignExtend(instr.immediate, 11);
-                        uint64_t value = ToUInt64(fregs[instr.rs2]);
-                        memory.Write32(address, static_cast<uint32_t>(value));
-                        memory.Write32(address + 4, static_cast<uint32_t>(value >> 32));
-                        break;
-                    }
-
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-                break;
-            
-            case RVInstruction::OP_FMADD: {
-                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-
-                switch (instr.fmt) {
-                    case RVInstruction::FMT_S: {
-                        float result = fregs[instr.rs1].f * fregs[instr.rs2].f + fregs[instr.rs3].f;
-
-                        if (CheckFloatErrors())
-                            result = NAN;
-                        
-                        fregs[instr.rd].f = result;
-                        break;
-                    }
-
-                    case RVInstruction::FMT_D: {
-                        double result = fregs[instr.rs1].d * fregs[instr.rs2].d + fregs[instr.rs3].d;
-
-                        if (CheckFloatErrors())
-                            result = NAN;
-                        
-                        fregs[instr.rd].d = result;
-                        break;
-                    }
-
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
-
-                ChangeRoundingMode();
-                break;
-            }
-
-            case RVInstruction::OP_FMSUB: {
-                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-
-                switch (instr.fmt) {
-                    case RVInstruction::FMT_S: {
-                        float result = fregs[instr.rs1].f * fregs[instr.rs2].f - fregs[instr.rs3].f;
-
-                        if (CheckFloatErrors())
-                            result = NAN;
-                        
-                        fregs[instr.rd].f = result;
-                        break;
-                    }
-
-                    case RVInstruction::FMT_D: {
-                        double result = fregs[instr.rs1].d * fregs[instr.rs2].d - fregs[instr.rs3].d;
-
-                        if (CheckFloatErrors())
-                            result = NAN;
-                        
-                        fregs[instr.rd].d = result;
-                        break;
-                    }
-
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
+            case Type::BEQ: {
+                if (regs[instr.rs1] == regs[instr.rs2])
+                    pc += instr.immediate;
                 
-                ChangeRoundingMode();
-                break;
-            }
-
-            case RVInstruction::OP_FNMSUB: {
-                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-
-                switch (instr.fmt) {
-                    case RVInstruction::FMT_S: {
-                        float result = -(fregs[instr.rs1].f * fregs[instr.rs2].f) + fregs[instr.rs3].f;
-
-                        if (CheckFloatErrors())
-                            result = NAN;
-                        
-                        fregs[instr.rd].f = result;
-                        break;
-                    }
-
-                    case RVInstruction::FMT_D: {
-                        double result = -(fregs[instr.rs1].d * fregs[instr.rs2].d) + fregs[instr.rs3].d;
-
-                        if (CheckFloatErrors())
-                            result = NAN;
-                        
-                        fregs[instr.rd].d = result;
-                        break;
-                    }
-
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
+                else
+                    pc += 4;
                 
-                ChangeRoundingMode();
                 break;
             }
-
-            case RVInstruction::OP_FNMADD: {
-                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-
-                switch (instr.fmt) {
-                    case RVInstruction::FMT_S: {
-                        float result = -(fregs[instr.rs1].f * fregs[instr.rs2].f) - fregs[instr.rs3].f;
-
-                        if (CheckFloatErrors())
-                            result = NAN;
-                        
-                        fregs[instr.rd].f = result;
-                        break;
-                    }
-
-                    case RVInstruction::FMT_D: {
-                        double result = -(fregs[instr.rs1].d * fregs[instr.rs2].d) - fregs[instr.rs3].d;
-
-                        if (CheckFloatErrors())
-                            result = NAN;
-                        
-                        fregs[instr.rd].d = result;
-                        break;
-                    }
-
-                    default:
-                        InvalidInstruction();
-                        break;
-                }
+            
+            case Type::BNE: {
+                if (regs[instr.rs1] != regs[instr.rs2])
+                    pc += instr.immediate;
                 
-                ChangeRoundingMode();
+                else
+                    pc += 4;
+                
+                break;
+            }
+            
+            case Type::BLT: {
+                if (AsSigned(regs[instr.rs1]) < AsSigned(regs[instr.rs2]))
+                    pc += instr.immediate;
+                
+                else
+                    pc += 4;
+                
+                break;
+            }
+            
+            case Type::BGE: {
+                if (AsSigned(regs[instr.rs1]) >= AsSigned(regs[instr.rs2]))
+                    pc += instr.immediate;
+                
+                else
+                    pc += 4;
+                
+                break;
+            }
+            
+            case Type::BLTU: {
+                if (regs[instr.rs1] < regs[instr.rs2])
+                    pc += instr.immediate;
+                
+                else
+                    pc += 4;
+                
+                break;
+            }
+            
+            case Type::BGEU: {
+                if (regs[instr.rs1] >= regs[instr.rs2])
+                    pc += instr.immediate;
+                
+                else
+                    pc += 4;
+                
+                break;
+            }
+            
+            case Type::LB: 
+                regs[instr.rd] = SignExtend(memory.Read8(regs[instr.rs1] + instr.immediate), 7);
+                break;
+            
+            case Type::LH:
+                regs[instr.rd] = SignExtend(memory.Read16(regs[instr.rs1] + instr.immediate), 15);
+                break;
+            
+            case Type::LW:
+                regs[instr.rd] = memory.Read32(regs[instr.rs1] + instr.immediate);
+                break;
+
+            case Type::LBU:
+                regs[instr.rd] = memory.Read8(regs[instr.rs1] + instr.immediate);
+                break;
+            
+            case Type::LHU:
+                regs[instr.rd] = memory.Read16(regs[instr.rs1] + instr.immediate);
+                break;
+            
+            case Type::SB:
+                memory.Write8(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+                break;
+            
+            case Type::SH:
+                memory.Write16(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+                break;
+            
+            case Type::SW:
+                memory.Write32(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+                break;
+            
+            case Type::ADDI:
+                regs[instr.rd] = regs[instr.rs1] + instr.immediate;
+                break;
+            
+            case Type::SLTI:
+                regs[instr.rd] = AsSigned(regs[instr.rs1]) < AsSigned(instr.immediate) ? 1 : 0;
+                break;
+            
+            case Type::SLTIU:
+                regs[instr.rd] = regs[instr.rs1] < instr.immediate ? 1 : 0;
+                break;
+            
+            case Type::XORI:
+                regs[instr.rd] = regs[instr.rs1] ^ instr.immediate;
+                break;
+            
+            case Type::ORI:
+                regs[instr.rd] = regs[instr.rs1] | instr.immediate;
+                break;
+            
+            case Type::ANDI:
+                regs[instr.rd] = regs[instr.rs1] & instr.immediate;
+                break;
+            
+            case Type::SLLI: {
+                auto amount = instr.rs2;
+                regs[instr.rd] = regs[instr.rs1] << amount;
+                break;
+            }
+            
+            case Type::SRLI: {
+                auto amount = instr.rs2;
+                regs[instr.rd] = regs[instr.rs1] >> amount;
+                break;
+            }
+            
+            case Type::SRAI: {
+                auto amount = instr.rs2;
+                auto value = regs[instr.rs1] >> amount;
+                uint32_t sign = -1U << amount;
+
+                if (regs[instr.rs1] & (1U << (32 - amount))) value |= sign;
+                regs[instr.rd] = value;
+                break;
+            }
+            
+            case Type::ADD:
+                regs[instr.rd] = regs[instr.rs1] + regs[instr.rs2];
+                break;
+            
+            case Type::SUB:
+                regs[instr.rd] = regs[instr.rs1] - regs[instr.rs2];
+                break;
+            
+            case Type::SLL: {
+                auto amount = regs[instr.rs2] & 0x1f;
+                regs[instr.rd] = regs[instr.rs1] << amount;
+                break;
+            }
+            
+            case Type::SLT:
+                regs[instr.rd] = AsSigned(regs[instr.rs1]) < AsSigned(regs[instr.rs2]) ? 1 : 0;
+                break;
+            
+            case Type::SLTU:
+                regs[instr.rd] = regs[instr.rs1] < regs[instr.rs2] ? 1 : 0;
+                break;
+            
+            case Type::XOR:
+                regs[instr.rd] = regs[instr.rs1] ^ regs[instr.rs2];
+                break;
+            
+            case Type::SRL: {
+                auto amount = regs[instr.rs2] & 0x1f;
+                regs[instr.rd] = regs[instr.rs1] >> amount;
+                break;
+            }
+            
+            case Type::SRA: {
+                auto amount = regs[instr.rs2] & 0x1f;
+                auto value = regs[instr.rs1] >> amount;
+                uint32_t sign = -1U << amount;
+
+                if (regs[instr.rs1] & (1U << (32 - amount))) value |= sign;
+                regs[instr.rd] = value;
+                break;
+            }
+            
+            case Type::OR:
+                regs[instr.rd] = regs[instr.rs1] | regs[instr.rs2];
+                break;
+            
+            case Type::AND:
+                regs[instr.rd] = regs[instr.rs1] & regs[instr.rs2];
+                break;
+            
+            case Type::FENCE:
+                break;
+            
+            case Type::ECALL:
+                if (!ecall_handlers.contains(regs[REG_A0]))
+                    EmptyECallHandler(memory, regs, fregs);
+                
+                else
+                    ecall_handlers[regs[REG_A0]](memory, regs, fregs);
+
+                break;
+            
+            case Type::EBREAK:
+                break;
+            
+            case Type::CSRRW: {
+                auto value = regs[instr.rs1];
+
+                if (instr.rd != REG_ZERO)
+                    regs[instr.rd] = ReadCSR(instr.immediate);
+                
+                WriteCSR(instr.immediate, value);
+                break;
+            }
+            
+            case Type::CSRRS: {
+                auto value = regs[instr.rs1];
+
+                if (instr.rd != REG_ZERO)
+                    regs[instr.rd] = ReadCSR(instr.immediate);
+                
+                if (instr.rs1 != REG_ZERO)
+                    WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) | value);
+                
+                break;
+            }
+            
+            case Type::CSRRC: {
+                auto value = regs[instr.rs1];
+                if (instr.rd != REG_ZERO)
+                    regs[instr.rd] = ReadCSR(instr.immediate);
+                
+                if (instr.rs1 != REG_ZERO)
+                    WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) & ~value);
+                
+                break;
+            }
+            
+            case Type::CSRRWI: {
+                auto value = instr.rs1;
+                if (instr.rd != REG_ZERO)
+                    regs[instr.rd] = ReadCSR(instr.immediate);
+                
+                WriteCSR(instr.immediate, value);
+                break;
+            }
+            
+            case Type::CSRRSI: {
+                auto value = instr.rs1;
+                if (instr.rd != REG_ZERO)
+                    regs[instr.rd] = ReadCSR(instr.immediate);
+                
+                WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) | value);
+                break;
+            }
+            
+            case Type::CSRRCI: {
+                auto value = instr.rs1;
+                if (instr.rd != REG_ZERO)
+                    regs[instr.rd] = ReadCSR(instr.immediate);
+                
+                WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) & ~value);
+                break;
+            }
+            
+            case Type::MUL: {
+                auto lhs = AsSigned(regs[instr.rs1]);
+                auto rhs = AsSigned(regs[instr.rs2]);
+                regs[instr.rd] = AsUnsigned(lhs * rhs);
+                break;
+            }
+            
+            case Type::MULH: {
+                int64_t lhs = AsSigned(regs[instr.rs1]);
+                int64_t rhs = AsSigned(regs[instr.rs2]);
+                int64_t result = lhs * rhs;
+                regs[instr.rd] = AsUnsigned(static_cast<int32_t>(result >> 32));
+                break;
+            }
+            
+            case Type::MULHSU: {
+                int64_t lhs = AsSigned(regs[instr.rs1]);
+                uint64_t rhs = regs[instr.rs2];
+                int64_t result = lhs * rhs;
+                regs[instr.rd] = AsUnsigned(static_cast<int32_t>(result >> 32));
+                break;
+            }
+            
+            case Type::MULHU: {
+                uint64_t lhs = regs[instr.rs1];
+                uint64_t rhs = regs[instr.rs2];
+                auto result = lhs * rhs;
+                regs[instr.rd] = static_cast<uint32_t>(result >> 32);
                 break;
             }
 
-            case RVInstruction::OP_FLOAT:
-                switch (instr.func7 >> 2) {
-                    case RVInstruction::FUNC7_FADD:
-                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+            case Type::DIV: {
+                auto lhs = AsSigned(regs[instr.rs1]);
+                auto rhs = AsSigned(regs[instr.rs2]);
 
-                        switch (instr.fmt) {
-                            case RVInstruction::FMT_S: {
-                                float result = fregs[instr.rs1].f + fregs[instr.rs2].f;
+                if (rhs == 0)
+                    throw std::runtime_error("Div by zero is not handled yet");
+                
+                regs[instr.rd] = AsUnsigned(lhs / rhs);
+                break;
+            }
+            
+            case Type::DIVU: {
+                auto lhs = regs[instr.rs1];
+                auto rhs = regs[instr.rs2];
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].f = result;
-                                break;
-                            }
+                if (rhs == 0)
+                    throw std::runtime_error("Div by zero is not handled yet");
+                
+                regs[instr.rd] = lhs / rhs;
+                break;
+            }
+            
+            case Type::REM: {
+                auto lhs = AsSigned(regs[instr.rs1]);
+                auto rhs = AsSigned(regs[instr.rs2]);
 
-                            case RVInstruction::FMT_D: {
-                                double result = fregs[instr.rs1].d + fregs[instr.rs2].d;
+                if (rhs == 0)
+                    throw std::runtime_error("Div by zero is not handled yet");
+                
+                regs[instr.rd] = AsUnsigned(lhs % rhs);
+                break;
+            }
+            
+            case Type::REMU: {
+                auto lhs = regs[instr.rs1];
+                auto rhs = regs[instr.rs2];
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].d = result;
-                                break;
-                            }
+                if (rhs == 0)
+                    throw std::runtime_error("Div by zero is not handled yet");
+                
+                regs[instr.rd] = lhs % rhs;
+                break;
+            }
+            
+            case Type::LR_W:
+                if (instr.rs2 != 0) InvalidInstruction();
+                regs[instr.rd] = memory.Read32Reserved(regs[instr.rs1], csrs[CSR_MHARTID]);
+                break;
+            
+            case Type::SC_W:
+                if (memory.Write32Conditional(regs[instr.rs1], regs[instr.rs2], csrs[CSR_MHARTID]))
+                    regs[instr.rd] = 0;
+                
+                else
+                    regs[instr.rd] = 1;
+                
+                break;
+            
+            case Type::AMOSWAP_W:
+                regs[instr.rd] = memory.AtomicSwap(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::AMOADD_W:
+                regs[instr.rd] = memory.AtomicAdd(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::AMOXOR_W:
+                regs[instr.rd] = memory.AtomicXor(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::AMOAND_W:
+                regs[instr.rd] = memory.AtomicAnd(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::AMOOR_W:
+                regs[instr.rd] = memory.AtomicOr(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::AMOMIN_W:
+                regs[instr.rd] = memory.AtomicMin(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::AMOMAX_W:
+                regs[instr.rd] = memory.AtomicMax(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::AMOMINU_W:
+                regs[instr.rd] = memory.AtomicMinU(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::AMOMAXU_W:
+                regs[instr.rd] = memory.AtomicMaxU(regs[instr.rs1], regs[instr.rs2]);
+                break;
+            
+            case Type::FLW:
+                fregs[instr.rd] = ToFloat(memory.Read32(regs[instr.rs1] + instr.immediate));
+                break;
+            
+            case Type::FSW:
+                memory.Write32(regs[instr.rs1] + instr.immediate, ToUInt32(fregs[instr.rs2]));
+                break;
+            
+            case Type::FMADD_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        
-                        ChangeRoundingMode();
-                        break;
+                bool lhs_is_inf;
+                bool rhs_is_zero;
+                ClassF32(fregs[instr.rs1], &lhs_is_inf, nullptr, nullptr, nullptr, nullptr, nullptr);
+                ClassF32(fregs[instr.rs2], nullptr, nullptr, nullptr, nullptr, &rhs_is_zero, nullptr);
 
-                    case RVInstruction::FUNC7_FSUB:
-                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                if (lhs_is_inf && rhs_is_zero) InvalidInstruction();
 
-                        switch (instr.fmt) {
-                            case RVInstruction::FMT_S: {
-                                float result = fregs[instr.rs1].f - fregs[instr.rs2].f;
+                float result = fregs[instr.rs1].f * fregs[instr.rs2].f + fregs[instr.rs3].f;
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].f = result;
-                                break;
-                            }
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F32_NAN;
+                
+                else
+                    fregs[instr.rd].f = result;
 
-                            case RVInstruction::FMT_D: {
-                                double result = fregs[instr.rs1].d - fregs[instr.rs2].d;
+                break;
+            }
+            
+            case Type::FMSUB_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].d = result;
-                                break;
-                            }
+                bool lhs_is_inf;
+                bool rhs_is_zero;
+                ClassF32(fregs[instr.rs1], &lhs_is_inf, nullptr, nullptr, nullptr, nullptr, nullptr);
+                ClassF32(fregs[instr.rs2], nullptr, nullptr, nullptr, nullptr, &rhs_is_zero, nullptr);
 
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        
-                        ChangeRoundingMode();
-                        break;
+                if (lhs_is_inf && rhs_is_zero) InvalidInstruction();
 
-                    case RVInstruction::FUNC7_FMUL:
-                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                float result = fregs[instr.rs1].f * fregs[instr.rs2].f - fregs[instr.rs3].f;
 
-                        switch (instr.fmt) {
-                            case RVInstruction::FMT_S: {
-                                float result = fregs[instr.rs1].f * fregs[instr.rs2].f;
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F32_NAN;
+                
+                else
+                    fregs[instr.rd].f = result;
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].f = result;
-                                break;
-                            }
+                break;
+            }
+            
+            case Type::FNMSUB_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                            case RVInstruction::FMT_D: {
-                                double result = fregs[instr.rs1].d * fregs[instr.rs2].d;
+                bool lhs_is_inf;
+                bool rhs_is_zero;
+                ClassF32(fregs[instr.rs1], &lhs_is_inf, nullptr, nullptr, nullptr, nullptr, nullptr);
+                ClassF32(fregs[instr.rs2], nullptr, nullptr, nullptr, nullptr, &rhs_is_zero, nullptr);
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].d = result;
-                                break;
-                            }
+                if (lhs_is_inf && rhs_is_zero) InvalidInstruction();
 
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        
-                        ChangeRoundingMode();
-                        break;
+                float result = -(fregs[instr.rs1].f * fregs[instr.rs2].f) + fregs[instr.rs3].f;
 
-                    case RVInstruction::FUNC7_FDIV:
-                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F32_NAN;
+                
+                else
+                    fregs[instr.rd].f = result;
 
-                        switch (instr.fmt) {
-                            case RVInstruction::FMT_S: {
-                                float result = fregs[instr.rs1].f / fregs[instr.rs2].f;
+                break;
+            }
+            
+            case Type::FNMADD_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].f = result;
-                                break;
-                            }
+                bool lhs_is_inf;
+                bool rhs_is_zero;
+                ClassF32(fregs[instr.rs1], &lhs_is_inf, nullptr, nullptr, nullptr, nullptr, nullptr);
+                ClassF32(fregs[instr.rs2], nullptr, nullptr, nullptr, nullptr, &rhs_is_zero, nullptr);
 
-                            case RVInstruction::FMT_D: {
-                                double result = fregs[instr.rs1].d / fregs[instr.rs2].d;
+                if (lhs_is_inf && rhs_is_zero) InvalidInstruction();
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].d = result;
-                                break;
-                            }
+                float result = -(fregs[instr.rs1].f * fregs[instr.rs2].f) - fregs[instr.rs3].f;
 
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        
-                        ChangeRoundingMode();
-                        break;
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F32_NAN;
+                
+                else
+                    fregs[instr.rd].f = result;
 
-                    case RVInstruction::FUNC7_FSQRT:
-                        if (instr.rs2 != 0) InvalidInstruction();
-                        if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
+                break;
+            }
+            
+            case Type::FADD_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                        switch (instr.fmt) {
-                            case RVInstruction::FMT_S: {
-                                float result = sqrtf(fregs[instr.rs1].f);
+                float result = fregs[instr.rs1].f + fregs[instr.rs2].f;
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].f = result;
-                                break;
-                            }
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F32_NAN;
 
-                            case RVInstruction::FMT_D: {
-                                double result = sqrt(fregs[instr.rs1].d);
+                else
+                    fregs[instr.rd].f = result;
+                
+                break;
+            }
+            
+            case Type::FSUB_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                                if (CheckFloatErrors())
-                                    result = NAN;
-                                
-                                fregs[instr.rd].d = result;
-                                break;
-                            }
+                float result = fregs[instr.rs1].f - fregs[instr.rs2].f;
 
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        
-                        ChangeRoundingMode();
-                        break;
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F32_NAN;
 
-                    case RVInstruction::FUNC7_FMIN_FMAX: {
-                        Float lhs = fregs[instr.rs1];
-                        Float rhs = fregs[instr.rs2];
-                        Float result;
+                else
+                    fregs[instr.rd].f = result;
+                
+                break;
+            }
+            
+            case Type::FMUL_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                        switch (instr.fmt) {
-                            case RVInstruction::FMT_S:
-                                switch (instr.func3) {
-                                    case RVInstruction::FUNC3_FMIN:
-                                        if (lhs.f < rhs.f) result = lhs;
-                                        else result = rhs;
-                                        break;
-                                    
-                                    case RVInstruction::FUNC3_FMAX:
-                                        if (lhs.f > rhs.f) result = lhs;
-                                        else result = rhs;
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            case RVInstruction::FMT_D:
-                                switch (instr.func3) {
-                                    case RVInstruction::FUNC3_FMIN:
-                                        if (lhs.d < rhs.d) result = lhs;
-                                        else result = rhs;
-                                        break;
-                                    
-                                    case RVInstruction::FUNC3_FMAX:
-                                        if (lhs.d > rhs.d) result = lhs;
-                                        else result = rhs;
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
+                float result = fregs[instr.rs1].f * fregs[instr.rs2].f;
 
-                        fregs[instr.rd] = result;
-                        break;
-                    }
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F32_NAN;
 
-                    case RVInstruction::FUNC7_FSGNJ: {
-                        Float rhs = fregs[instr.rs2];
-                        Float result = fregs[instr.rs1];
+                else
+                    fregs[instr.rd].f = result;
+                
+                break;
+            }
+            
+            case Type::FDIV_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                        switch (instr.func3) {
-                            case RVInstruction::FUNC3_FSGNJ:
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        result.u32 &= ~(1<<31);
-                                        result.u32 |= rhs.u32 & (1<<31);
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        result.u64 &= ~(1ULL<<63);
-                                        result.u64 |= rhs.u64 & (1ULL<<63);
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            case RVInstruction::FUNC3_FSGNJN:
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        result.u32 &= ~(1<<31);
-                                        result.u32 |= (~rhs.u32) & (1<<31);
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        result.u64 &= ~(1ULL<<63);
-                                        result.u64 |= (~rhs.u64) & (1ULL<<63);
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            case RVInstruction::FUNC3_FSGNJX:
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        result.u32 ^= rhs.u32 & (1<<31);
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        result.u64 ^= rhs.u64 & (1ULL<<63);
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            default:
-                                InvalidInstruction();
-                                break;
+                float result = fregs[instr.rs1].f / fregs[instr.rs2].f;
 
-                        }
-                        fregs[instr.rd] = result;
-                        break;
-                    }
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F32_NAN;
 
-                    case RVInstruction::FUNC7_FCVT_W:
-                        switch (instr.rs2) {
-                            case RVInstruction::RS2_FCVT_W_S:
-                                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        regs[instr.rd] = AsUnsigned(static_cast<int32_t>(fregs[instr.rs1].f));
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        regs[instr.rd] = AsUnsigned(static_cast<int32_t>(fregs[instr.rs1].d));
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                CheckFloatErrors();
-                                ChangeRoundingMode();
-                                break;
-                            
-                            case RVInstruction::RS2_FCVT_WU_S:
-                                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        regs[instr.rd] = AsUnsigned(static_cast<uint32_t>(fregs[instr.rs1].f));
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        regs[instr.rd] = AsUnsigned(static_cast<uint32_t>(fregs[instr.rs1].d));
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                CheckFloatErrors();
-                                ChangeRoundingMode();
-                                break;
-                            
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC7_FMV_X_FCLASS:
-                        switch (instr.func3) {
-                            case RVInstruction::FUNC3_FMV_X_W:
-                                if (instr.rs2 != RVInstruction::RS2_FMV_X_W) InvalidInstruction();
-                                regs[instr.rd] = ToUInt32(fregs[instr.rs1]);
-                                break;
-                            
-                            case RVInstruction::FUNC3_FCLASS: {
-                                struct FClass {
-                                    union {
-                                        struct {
-                                            uint32_t is_neg_inf : 1;
-                                            uint32_t is_neg_normal : 1;
-                                            uint32_t is_neg_subnormal : 1;
-                                            uint32_t is_neg_zero : 1;
-                                            uint32_t is_pos_zero : 1;
-                                            uint32_t is_pos_subnormal : 1;
-                                            uint32_t is_pos_normal : 1;
-                                            uint32_t is_pos_inf : 1;
-                                            uint32_t is_nan : 1;
-                                            uint32_t is_qnan : 1;
-                                        };
-                                        uint32_t raw;
-                                    };
-                                };
+                else
+                    fregs[instr.rd].f = result;
+                
+                break;
+            }
+            
+            case Type::FSQRT_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
 
-                                FClass fclass;
-                                fclass.raw = 0;
+                bool is_inf, is_nan, is_qnan, is_neg;
+                ClassF32(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, &is_neg);
 
-                                Float value = fregs[instr.rs1];
+                if (is_inf || is_nan || is_qnan || is_neg)
+                    fregs[instr.rd].u64 = RV_F32_NAN;
+                
+                else
+                    fregs[instr.rd].f = sqrtf(fregs[instr.rs1].f);
+                
+                break;
+            }
+            
+            case Type::FSGNJ_S: {
+                Float result = fregs[instr.rs1];
+                Float rhs = fregs[instr.rs2];
 
-                                bool is_inf = false;
-                                bool is_nan = false;
-                                bool is_qnan = false;
-                                bool is_subnormal = false;
-                                bool is_zero = false;
-                                bool is_neg = false;
+                result.u32 &= ~(1<<31);
+                result.u32 |= rhs.u32 & (1<<31);
+                fregs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FSGNJN_S: {
+                Float result = fregs[instr.rs1];
+                Float rhs = fregs[instr.rs2];
 
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S: {
-                                        uint8_t sign = value.u32 >> 31;
-                                        uint8_t exp = (value.u32 >> 23) & 0xff;
-                                        uint32_t frac = value.u32 & 0x7fffff;
+                result.u32 &= ~(1<<31);
+                result.u32 |= (~rhs.u32) & (1<<31);
+                fregs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FSGNJX_S: {
+                Float result = fregs[instr.rs1];
+                Float rhs = fregs[instr.rs2];
 
-                                        is_inf = exp == 0xff && frac == 0;
-                                        is_nan = exp == 0xff && frac != 0 && !(frac & 0x400000);
-                                        is_qnan = exp == 0xff && frac != 0 && (frac & 0x400000);
-                                        is_subnormal = exp == 0 && frac != 0;
-                                        is_zero = exp == 0 && frac == 0;
-                                        is_neg = sign != 0;
+                result.u32 ^= rhs.u32 & (1<<31);
+                fregs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FMIN_S: {
+                bool lhs_neg;
+                bool rhs_neg;
+                bool lhs_snan, lhs_qnan;
+                bool rhs_snan, rhs_qnan;
+                ClassF32(fregs[instr.rs1], nullptr, &lhs_snan, &lhs_qnan, nullptr, nullptr, &lhs_neg);
+                ClassF32(fregs[instr.rs2], nullptr, &rhs_snan, &rhs_qnan, nullptr, nullptr, &rhs_neg);
+                bool lhs_nan = lhs_snan || lhs_qnan;
+                bool rhs_nan = rhs_snan || rhs_qnan;
 
-                                        break;
-                                    }
-
-                                    case RVInstruction::FMT_D: {
-                                        uint8_t sign = value.u64 >> 63;
-                                        uint16_t exp = (value.u64 >> 52) & 0x7ff;
-                                        uint64_t frac = value.u64 & 0xfffffffffffff;
-
-                                        is_inf = exp == 0x7ff && frac == 0;
-                                        is_nan = exp == 0x7ff && frac != 0 && !(frac & 0x8000000000000);
-                                        is_qnan = exp == 0x7ff && frac != 0 && (frac & 0x8000000000000);
-                                        is_subnormal = exp == 0 && frac != 0;
-                                        is_zero = exp == 0 && frac == 0;
-                                        is_neg = sign != 0;
-                                        
-                                        break;
-                                    }
-
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-
-                                bool is_normal = !is_inf && !is_nan && !is_qnan && !is_subnormal && !is_zero;
-
-                                if (is_neg) {
-                                    fclass.is_neg_inf = is_inf;
-                                    fclass.is_neg_normal = is_normal;
-                                    fclass.is_neg_subnormal = is_subnormal;
-                                    fclass.is_neg_zero = is_zero;
-                                } else {
-                                    fclass.is_pos_inf = is_inf;
-                                    fclass.is_pos_normal = is_normal;
-                                    fclass.is_pos_subnormal = is_subnormal;
-                                    fclass.is_pos_zero = is_zero;
-                                }
-                                
-                                fclass.is_nan = is_nan;
-                                fclass.is_qnan = is_qnan;
-
-                                regs[instr.rd] = fclass.raw;
-                                break;
-                            }
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC7_FCOMPARE: {
-                        Float lhs = fregs[instr.rs1];
-                        Float rhs = fregs[instr.rs2];
-                        uint32_t result = 0;
-
-                        switch (instr.func3) {
-                            case RVInstruction::FUNC3_FEQ:
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        if (lhs.f == rhs.f) result = 1;
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        if (lhs.d == rhs.d) result = 1;
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            case RVInstruction::FUNC3_FLT:
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        if (lhs.f < rhs.f) result = 1;
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        if (lhs.d < rhs.d) result = 1;
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            case RVInstruction::FUNC3_FLE:
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        if (lhs.f <= rhs.f) result = 1;
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        if (lhs.d <= rhs.d) result = 1;
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-
-                        regs[instr.rd] = result;
-                        break;
-                    }
-
-                    case RVInstruction::FUNC7_FCVT:
-                        switch (instr.rs2) {
-                            case RVInstruction::RS2_FCVT_W:
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S: {
-                                        if (!ChangeRoundingMode()) InvalidInstruction();
-                                        int32_t value = AsSigned(regs[instr.rs1]);
-                                        fregs[instr.rd].f = value;
-                                        CheckFloatErrors();
-                                        ChangeRoundingMode();
-                                        break;
-                                    }
-
-                                    case RVInstruction::FMT_D: {
-                                        if (!ChangeRoundingMode()) InvalidInstruction();
-                                        int32_t value = AsSigned(regs[instr.rs1]);
-                                        fregs[instr.rd].d = value;
-                                        CheckFloatErrors();
-                                        ChangeRoundingMode();
-                                        break;
-                                    }
-
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            case RVInstruction::RS2_FCVT_WU:
-                                switch (instr.fmt) {
-                                    case RVInstruction::FMT_S:
-                                        if (!ChangeRoundingMode()) InvalidInstruction();
-                                        fregs[instr.rd].f = regs[instr.rs1];
-                                        CheckFloatErrors();
-                                        ChangeRoundingMode();
-                                        break;
-                                    
-                                    case RVInstruction::FMT_D:
-                                        if (!ChangeRoundingMode()) InvalidInstruction();
-                                        fregs[instr.rd].d = regs[instr.rs1];
-                                        CheckFloatErrors();
-                                        ChangeRoundingMode();
-                                        break;
-                                    
-                                    default:
-                                        InvalidInstruction();
-                                        break;
-                                }
-                                break;
-                            
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-                    
-                    case RVInstruction::FUNC7_FMV_W_X:
-                        if (instr.func3 != RVInstruction::FUNC3_FMV_W_X) InvalidInstruction();
-                        if (instr.rs2 != RVInstruction::RS2_FMV_W_X) InvalidInstruction();
-
-                        fregs[instr.rd].u32 = regs[instr.rs1];
-                        break;
-                    
-                    case RVInstruction::FUNC7_FCVT_D:
-                        switch (instr.rs2) {
-                            case RVInstruction::RS2_FCVT_S_D:
-                                if (instr.fmt != RVInstruction::FMT_S) InvalidInstruction();
-                                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-                                fregs[instr.rd].f = fregs[instr.rs1].d;
-                                CheckFloatErrors();
-                                ChangeRoundingMode();
-                                break;
-                            
-                            case RVInstruction::RS2_FCVT_D_S:
-                                if (instr.fmt != RVInstruction::FMT_D) InvalidInstruction();
-                                if (!ChangeRoundingMode(instr.func3)) InvalidInstruction();
-                                fregs[instr.rd].d = fregs[instr.rs1].f;
-                                CheckFloatErrors();
-                                ChangeRoundingMode();
-                                break;
-                            
-                            default:
-                                InvalidInstruction();
-                                break;
-                        }
-                        break;
-
-                    default:
-                        InvalidInstruction();
-                        break;
+                if (lhs_nan && rhs_nan) {
+                    SetFloatFlags(true, false, false, false, false);
+                    fregs[instr.rd].u64 = RV_F32_NAN;
+                    break;
                 }
+
+                bool lhs_less;
+                if (lhs_nan) {
+                    lhs_less = false;
+                    SetFloatFlags(true, false, false, false, false);
+                }
+                else if (rhs_nan) {
+                    lhs_less = true;
+                    SetFloatFlags(true, false, false, false, false);
+                }
+                else if (lhs_neg && !rhs_neg) lhs_less = true;
+                else if (!lhs_neg && rhs_neg) lhs_less = false;
+                else if (fregs[instr.rs1].f < fregs[instr.rs2].f) lhs_less = true;
+
+                if (lhs_less)
+                    fregs[instr.rd] = fregs[instr.rs1];
+                
+                else
+                    fregs[instr.rd] = fregs[instr.rs2];
+                
+                break;
+            }
+            
+            case Type::FMAX_S: {
+                bool lhs_neg;
+                bool rhs_neg;
+                bool lhs_snan, lhs_qnan;
+                bool rhs_snan, rhs_qnan;
+                ClassF32(fregs[instr.rs1], nullptr, &lhs_snan, &lhs_qnan, nullptr, nullptr, &lhs_neg);
+                ClassF32(fregs[instr.rs2], nullptr, &rhs_snan, &rhs_qnan, nullptr, nullptr, &rhs_neg);
+                bool lhs_nan = lhs_snan || lhs_qnan;
+                bool rhs_nan = rhs_snan || rhs_qnan;
+
+                if (lhs_nan && rhs_nan) {
+                    SetFloatFlags(true, false, false, false, false);
+                    fregs[instr.rd].u64 = RV_F32_NAN;
+                    break;
+                }
+
+                bool lhs_less;
+                if (lhs_nan) {
+                    lhs_less = false;
+                    SetFloatFlags(true, false, false, false, false);
+                }
+                else if (rhs_nan) {
+                    lhs_less = true;
+                    SetFloatFlags(true, false, false, false, false);
+                }
+                else if (lhs_neg && !rhs_neg) lhs_less = true;
+                else if (!lhs_neg && rhs_neg) lhs_less = false;
+                else if (fregs[instr.rs1].f < fregs[instr.rs2].f) lhs_less = true;
+
+                if (!lhs_less)
+                    fregs[instr.rd] = fregs[instr.rs1];
+                
+                else
+                    fregs[instr.rd] = fregs[instr.rs2];
+                
+                break;
+            }
+            
+            case Type::FCVT_W_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool is_inf, is_nan, is_qnan;
+                ClassF32(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
+                
+                uint32_t result;
+
+                if (is_inf) {
+                    if (fregs[instr.rs1].f < 0) result = -1U;
+                    else result = 0x7fffffff;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else if (is_nan || is_qnan) {
+                    result = 0x7fffffff;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else {
+                    int32_t val = fregs[instr.rs1].f;
+                    if (val != fregs[instr.rs1].f)
+                        SetFloatFlags(false, false, false, false, true);
+
+                    result = AsUnsigned(static_cast<int32_t>(val));
+                }
+
+                regs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FCVT_WU_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool is_inf, is_nan, is_qnan;
+                ClassF32(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
+
+                uint32_t result;
+
+                if (is_inf) {
+                    if (fregs[instr.rs1].f < 0) result = 0;
+                    else result = -1U;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else if (is_nan || is_qnan) {
+                    result = -1U;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else {
+                    uint32_t val = fregs[instr.rs1].f;
+                    if (val != fregs[instr.rs1].f)
+                        SetFloatFlags(false, false, false, false, true);
+                    
+                    result = val;
+                }
+
+                regs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FMV_X_W:
+                regs[instr.rd] = ToUInt32(fregs[instr.rs1]);
+                break;
+            
+            case Type::FEQ_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                auto lhs = fregs[instr.rs1];
+                auto rhs = fregs[instr.rs2];
+
+                bool lhs_nan, lhs_qnan;
+                bool rhs_nan, rhs_qnan;
+                ClassF32(lhs, nullptr, &lhs_nan, &lhs_qnan, nullptr, nullptr, nullptr);
+                ClassF32(rhs, nullptr, &rhs_nan, &rhs_qnan, nullptr, nullptr, nullptr);
+
+                if (lhs_nan || rhs_nan)
+                    SetFloatFlags(true, false, false, false, false);
+                
+                if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan)
+                    regs[instr.rd] = 0;
+                
+                else
+                    regs[instr.rd] = lhs.f == rhs.f ? 1 : 0;
+                
+                break;
+            }
+            
+            case Type::FLT_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                auto lhs = fregs[instr.rs1];
+                auto rhs = fregs[instr.rs2];
+
+                bool lhs_nan, lhs_qnan;
+                bool rhs_nan, rhs_qnan;
+                ClassF32(lhs, nullptr, &lhs_nan, &lhs_qnan, nullptr, nullptr, nullptr);
+                ClassF32(rhs, nullptr, &rhs_nan, &rhs_qnan, nullptr, nullptr, nullptr);
+                
+                if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan) {
+                    SetFloatFlags(true, false, false, false, false);
+                    regs[instr.rd] = 0;
+                }
+                else
+                    regs[instr.rd] = lhs.f < rhs.f ? 1 : 0;
+                
+                break;
+            }
+            
+            case Type::FLE_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                auto lhs = fregs[instr.rs1];
+                auto rhs = fregs[instr.rs2];
+
+                bool lhs_nan, lhs_qnan;
+                bool rhs_nan, rhs_qnan;
+                ClassF32(lhs, nullptr, &lhs_nan, &lhs_qnan, nullptr, nullptr, nullptr);
+                ClassF32(rhs, nullptr, &rhs_nan, &rhs_qnan, nullptr, nullptr, nullptr);
+                
+                if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan) {
+                    SetFloatFlags(true, false, false, false, false);
+                    regs[instr.rd] = 0;
+                }
+                else
+                    regs[instr.rd] = lhs.f <= rhs.f ? 1 : 0;
+                
+                break;
+            }
+            
+            case Type::FCLASS_S: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool is_inf, is_nan, is_qnan, is_subnormal, is_zero, is_neg;
+                ClassF32(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, &is_subnormal, &is_zero, &is_neg);
+                
+                uint32_t result = 0;
+                if (is_inf && is_neg) result |= 1 << 0;
+                if (!is_subnormal && is_neg) result |= 1 << 1;
+                if (is_subnormal && is_neg) result |= 1 << 2;
+                if (is_zero && is_neg) result |= 1 << 3;
+                if (is_zero && !is_neg) result |= 1 << 4;
+                if (is_subnormal && !is_neg) result |= 1 << 5;
+                if (!is_subnormal && !is_nan) result |= 1 << 6;
+                if (is_inf && !is_neg) result |= 1 << 7;
+                if (is_nan) result |= 1 << 8;
+                if (is_qnan) result |= 1 << 9;
+
+                regs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FCVT_S_W: {
+                auto val = AsSigned(regs[instr.rs1]);
+
+                fregs[instr.rd].f = val;
+                if (fregs[instr.rd].f != val)
+                    SetFloatFlags(true, false, false, false, false);
+                
+                break;
+            }
+            
+            case Type::FCVT_S_WU:
+                fregs[instr.rd].f = regs[instr.rs1];
+                if (fregs[instr.rd].f != regs[instr.rs1])
+                    SetFloatFlags(true, false, false, false, false);
+                
+                break;
+            
+            case Type::FMV_W_X:
+                fregs[instr.rd].u64 = 0;
+                fregs[instr.rd].u32 = regs[instr.rs1];
+                break;
+            
+            case Type::FLD: {
+                auto addr = regs[instr.rs1] + instr.immediate;
+                uint64_t val = memory.Read32(addr);
+                val |= static_cast<uint64_t>(memory.Read32(addr + 4)) << 32;
+                fregs[instr.rd] = ToDouble(val);
+                break;
+            }
+            
+            case Type::FSD: {
+                auto addr = regs[instr.rs1] + instr.immediate;
+                auto val = ToUInt64(fregs[instr.rs2]);
+                memory.Write32(addr, static_cast<uint32_t>(val));
+                memory.Write32(addr + 4, static_cast<uint32_t>(val >> 32));
+                break;
+            }
+            
+            case Type::FMADD_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool lhs_is_inf;
+                bool rhs_is_zero;
+                ClassF64(fregs[instr.rs1], &lhs_is_inf, nullptr, nullptr, nullptr, nullptr, nullptr);
+                ClassF64(fregs[instr.rs2], nullptr, nullptr, nullptr, nullptr, &rhs_is_zero, nullptr);
+
+                if (lhs_is_inf && rhs_is_zero) InvalidInstruction();
+
+                double result = fregs[instr.rs1].d * fregs[instr.rs2].d + fregs[instr.rs3].d;
+
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+                
+                else
+                    fregs[instr.rd].d = result;
+
+                break;
+            }
+            
+            case Type::FMSUB_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool lhs_is_inf;
+                bool rhs_is_zero;
+                ClassF64(fregs[instr.rs1], &lhs_is_inf, nullptr, nullptr, nullptr, nullptr, nullptr);
+                ClassF64(fregs[instr.rs2], nullptr, nullptr, nullptr, nullptr, &rhs_is_zero, nullptr);
+
+                if (lhs_is_inf && rhs_is_zero) InvalidInstruction();
+
+                double result = fregs[instr.rs1].d * fregs[instr.rs2].d - fregs[instr.rs3].d;
+
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+                
+                else
+                    fregs[instr.rd].d = result;
+
+                break;
+            }
+            
+            case Type::FNMSUB_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool lhs_is_inf;
+                bool rhs_is_zero;
+                ClassF64(fregs[instr.rs1], &lhs_is_inf, nullptr, nullptr, nullptr, nullptr, nullptr);
+                ClassF64(fregs[instr.rs2], nullptr, nullptr, nullptr, nullptr, &rhs_is_zero, nullptr);
+
+                if (lhs_is_inf && rhs_is_zero) InvalidInstruction();
+
+                double result = -(fregs[instr.rs1].d * fregs[instr.rs2].d) + fregs[instr.rs3].d;
+
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+                
+                else
+                    fregs[instr.rd].d = result;
+
+                break;
+            }
+            
+            case Type::FNMADD_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool lhs_is_inf;
+                bool rhs_is_zero;
+                ClassF64(fregs[instr.rs1], &lhs_is_inf, nullptr, nullptr, nullptr, nullptr, nullptr);
+                ClassF64(fregs[instr.rs2], nullptr, nullptr, nullptr, nullptr, &rhs_is_zero, nullptr);
+
+                if (lhs_is_inf && rhs_is_zero) InvalidInstruction();
+
+                double result = -(fregs[instr.rs1].d * fregs[instr.rs2].d) - fregs[instr.rs3].d;
+
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+                
+                else
+                    fregs[instr.rd].d = result;
+
+                break;
+            }
+            
+            case Type::FADD_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                double result = fregs[instr.rs1].d + fregs[instr.rs2].d;
+
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+
+                else
+                    fregs[instr.rd].d = result;
+                
+                break;
+            }
+            
+            case Type::FSUB_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                double result = fregs[instr.rs1].d - fregs[instr.rs2].d;
+
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+
+                else
+                    fregs[instr.rd].d = result;
+                
+                break;
+            }
+            
+            case Type::FMUL_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                double result = fregs[instr.rs1].d * fregs[instr.rs2].d;
+
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+
+                else
+                    fregs[instr.rd].d = result;
+                
+                break;
+            }
+            
+            case Type::FDIV_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                double result = fregs[instr.rs1].d / fregs[instr.rs2].d;
+
+                if (CheckFloatErrors())
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+
+                else
+                    fregs[instr.rd].d = result;
+                
+                break;
+            }
+            
+            case Type::FSQRT_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool is_inf, is_nan, is_qnan, is_neg;
+                ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, &is_neg);
+
+                if (is_inf || is_nan || is_qnan || is_neg)
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+                
+                else
+                    fregs[instr.rd].d = sqrt(fregs[instr.rs1].d);
+                
+                break;
+            }
+            
+            case Type::FSGNJ_D: {
+                Float result = fregs[instr.rs1];
+                Float rhs = fregs[instr.rs2];
+
+                result.u64 &= ~(1U<<63);
+                result.u64 |= rhs.u64 & (1U<<63);
+                fregs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FSGNJN_D: {
+                Float result = fregs[instr.rs1];
+                Float rhs = fregs[instr.rs2];
+
+                result.u64 &= ~(1U<<63);
+                result.u64 |= (~rhs.u64) & (1U<<63);
+                fregs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FSGNJX_D: {
+                Float result = fregs[instr.rs1];
+                Float rhs = fregs[instr.rs2];
+
+                result.u64 ^= rhs.u64 & (1U<<63);
+                fregs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FMIN_D: {
+                bool lhs_neg;
+                bool rhs_neg;
+                bool lhs_snan, lhs_qnan;
+                bool rhs_snan, rhs_qnan;
+                ClassF64(fregs[instr.rs1], nullptr, &lhs_snan, &lhs_qnan, nullptr, nullptr, &lhs_neg);
+                ClassF64(fregs[instr.rs2], nullptr, &rhs_snan, &rhs_qnan, nullptr, nullptr, &rhs_neg);
+                bool lhs_nan = lhs_snan || lhs_qnan;
+                bool rhs_nan = rhs_snan || rhs_qnan;
+
+                if (lhs_nan && rhs_nan) {
+                    SetFloatFlags(true, false, false, false, false);
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+                    break;
+                }
+
+                bool lhs_less;
+                if (lhs_nan) {
+                    lhs_less = false;
+                    SetFloatFlags(true, false, false, false, false);
+                }
+                else if (rhs_nan) {
+                    lhs_less = true;
+                    SetFloatFlags(true, false, false, false, false);
+                }
+                else if (lhs_neg && !rhs_neg) lhs_less = true;
+                else if (!lhs_neg && rhs_neg) lhs_less = false;
+                else if (fregs[instr.rs1].d < fregs[instr.rs2].d) lhs_less = true;
+
+                if (lhs_less)
+                    fregs[instr.rd] = fregs[instr.rs1];
+                
+                else
+                    fregs[instr.rd] = fregs[instr.rs2];
+                
+                break;
+            }
+            
+            case Type::FMAX_D: {
+                bool lhs_neg;
+                bool rhs_neg;
+                bool lhs_snan, lhs_qnan;
+                bool rhs_snan, rhs_qnan;
+                ClassF64(fregs[instr.rs1], nullptr, &lhs_snan, &lhs_qnan, nullptr, nullptr, &lhs_neg);
+                ClassF64(fregs[instr.rs2], nullptr, &rhs_snan, &rhs_qnan, nullptr, nullptr, &rhs_neg);
+                bool lhs_nan = lhs_snan || lhs_qnan;
+                bool rhs_nan = rhs_snan || rhs_qnan;
+
+                if (lhs_nan && rhs_nan) {
+                    SetFloatFlags(true, false, false, false, false);
+                    fregs[instr.rd].u64 = RV_F64_NAN;
+                    break;
+                }
+
+                bool lhs_less;
+                if (lhs_nan) {
+                    lhs_less = false;
+                    SetFloatFlags(true, false, false, false, false);
+                }
+                else if (rhs_nan) {
+                    lhs_less = true;
+                    SetFloatFlags(true, false, false, false, false);
+                }
+                else if (lhs_neg && !rhs_neg) lhs_less = true;
+                else if (!lhs_neg && rhs_neg) lhs_less = false;
+                else if (fregs[instr.rs1].d < fregs[instr.rs2].d) lhs_less = true;
+
+                if (!lhs_less)
+                    fregs[instr.rd] = fregs[instr.rs1];
+                
+                else
+                    fregs[instr.rd] = fregs[instr.rs2];
+                
+                break;
+            }
+            
+            case Type::FCVT_S_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                
+                bool lhs_snan, lhs_qnan;
+                ClassF64(fregs[instr.rs1], nullptr, &lhs_snan, &lhs_qnan, nullptr, nullptr, nullptr);
+
+                if (lhs_snan) fregs[instr.rd].u64 = RV_F32_NAN;
+                else if (lhs_qnan) fregs[instr.rd].u64 = RV_F32_QNAN;
+                else {
+                    auto val = fregs[instr.rs1].d;
+                    fregs[instr.rd].u64 = 0;
+                    fregs[instr.rd].f = val;
+                }
+
+                break;
+            }
+            
+            case Type::FCVT_D_S: {
+                bool lhs_snan, lhs_qnan;
+                ClassF32(fregs[instr.rs1], nullptr, &lhs_snan, &lhs_qnan, nullptr, nullptr, nullptr);
+
+                if (lhs_snan) fregs[instr.rd].u64 = RV_F64_NAN;
+                else if (lhs_qnan) fregs[instr.rd].u64 = RV_F64_QNAN;
+                else fregs[instr.rd].d = fregs[instr.rs1].f;
+
+                break;
+            }
+            
+            case Type::FEQ_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                auto lhs = fregs[instr.rs1];
+                auto rhs = fregs[instr.rs2];
+
+                bool lhs_nan, lhs_qnan;
+                bool rhs_nan, rhs_qnan;
+                ClassF64(lhs, nullptr, &lhs_nan, &lhs_qnan, nullptr, nullptr, nullptr);
+                ClassF64(rhs, nullptr, &rhs_nan, &rhs_qnan, nullptr, nullptr, nullptr);
+
+                if (lhs_nan || rhs_nan)
+                    SetFloatFlags(true, false, false, false, false);
+                
+                if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan)
+                    regs[instr.rd] = 0;
+                
+                else
+                    regs[instr.rd] = lhs.d == rhs.d ? 1 : 0;
+                
+                break;
+            }
+            
+            case Type::FLT_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                auto lhs = fregs[instr.rs1];
+                auto rhs = fregs[instr.rs2];
+
+                bool lhs_nan, lhs_qnan;
+                bool rhs_nan, rhs_qnan;
+                ClassF64(lhs, nullptr, &lhs_nan, &lhs_qnan, nullptr, nullptr, nullptr);
+                ClassF64(rhs, nullptr, &rhs_nan, &rhs_qnan, nullptr, nullptr, nullptr);
+                
+                if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan) {
+                    SetFloatFlags(true, false, false, false, false);
+                    regs[instr.rd] = 0;
+                }
+                else
+                    regs[instr.rd] = lhs.d < rhs.d ? 1 : 0;
+                
+                break;
+            }
+            
+            case Type::FLE_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                auto lhs = fregs[instr.rs1];
+                auto rhs = fregs[instr.rs2];
+
+                bool lhs_nan, lhs_qnan;
+                bool rhs_nan, rhs_qnan;
+                ClassF64(lhs, nullptr, &lhs_nan, &lhs_qnan, nullptr, nullptr, nullptr);
+                ClassF64(rhs, nullptr, &rhs_nan, &rhs_qnan, nullptr, nullptr, nullptr);
+                
+                if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan) {
+                    SetFloatFlags(true, false, false, false, false);
+                    regs[instr.rd] = 0;
+                }
+                else
+                    regs[instr.rd] = lhs.d <= rhs.d ? 1 : 0;
+                
+                break;
+            }
+            
+            case Type::FCLASS_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool is_inf, is_nan, is_qnan, is_subnormal, is_zero, is_neg;
+                ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, &is_subnormal, &is_zero, &is_neg);
+                
+                uint32_t result = 0;
+                if (is_inf && is_neg) result |= 1 << 0;
+                if (!is_subnormal && is_neg) result |= 1 << 1;
+                if (is_subnormal && is_neg) result |= 1 << 2;
+                if (is_zero && is_neg) result |= 1 << 3;
+                if (is_zero && !is_neg) result |= 1 << 4;
+                if (is_subnormal && !is_neg) result |= 1 << 5;
+                if (!is_subnormal && !is_nan) result |= 1 << 6;
+                if (is_inf && !is_neg) result |= 1 << 7;
+                if (is_nan) result |= 1 << 8;
+                if (is_qnan) result |= 1 << 9;
+
+                regs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FCVT_W_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool is_inf, is_nan, is_qnan;
+                ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
+                
+                uint32_t result;
+
+                if (is_inf) {
+                    if (fregs[instr.rs1].d < 0) result = -1U;
+                    else result = 0x7fffffff;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else if (is_nan || is_qnan) {
+                    result = 0x7fffffff;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else {
+                    int32_t val = fregs[instr.rs1].d;
+                    if (val != fregs[instr.rs1].d)
+                        SetFloatFlags(false, false, false, false, true);
+
+                    result = AsUnsigned(static_cast<int32_t>(val));
+                }
+
+                regs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FCVT_WU_D: {
+                if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+
+                bool is_inf, is_nan, is_qnan;
+                ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
+
+                uint32_t result;
+
+                if (is_inf) {
+                    if (fregs[instr.rs1].d < 0) result = 0;
+                    else result = -1U;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else if (is_nan || is_qnan) {
+                    result = -1U;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else {
+                    uint32_t val = fregs[instr.rs1].d;
+                    if (val != fregs[instr.rs1].d)
+                        SetFloatFlags(false, false, false, false, true);
+                    
+                    result = val;
+                }
+
+                regs[instr.rd] = result;
+                break;
+            }
+            
+            case Type::FCVT_D_W: {
+                auto val = AsSigned(regs[instr.rs1]);
+
+                fregs[instr.rd].d = val;
+                if (fregs[instr.rd].d != val)
+                    SetFloatFlags(true, false, false, false, false);
+                
+                break;
+            }
+            
+            case Type::FCVT_D_WU:
+                fregs[instr.rd].d = regs[instr.rs1];
+                if (fregs[instr.rd].d != regs[instr.rs1])
+                    SetFloatFlags(true, false, false, false, false);
+                
+                break;
+            
+            case Type::URET:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::SRET:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::MRET:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::WFI:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::SFENCE_VMA:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::SINVAL_VMA:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::SINVAL_GVMA:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::SFENCE_W_INVAL:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::SFENCE_INVAL_IR:
+                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
                 break;
 
+            case Type::INVALID:
             default:
                 InvalidInstruction();
                 break;
         }
 
-        switch (instr.opcode) {
-            case RVInstruction::OP_JAL:
-            case RVInstruction::OP_JALR:
-            case RVInstruction::OP_BRANCH:
+        switch (instr.type) {
+            case Type::JAL:
+            case Type::JALR:
+            case Type::BEQ:
+            case Type::BGE:
+            case Type::BGEU:
+            case Type::BLT:
+            case Type::BLTU:
+            case Type::BNE:
                 break;
             
             default:
                 pc += 4;
-                break;
         }
-
+        
         if (instr.rd == 0) regs[instr.rd] = 0;
 
         if (IsBreakPoint(pc)) return true;
@@ -1720,34 +1786,7 @@ void VirtualMachine::GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers
 }
 
 VirtualMachine::TLBEntry VirtualMachine::GetTLBLookup(uint32_t phys_addr, bool bypass_cache) {
-    uint32_t table_addr = csrs[CSR_SATP];
-
-    if ((table_addr & (1ULL << 31)) == 0) return TLBEntry::CreateNonVirtual(*this);
-
-    if (!bypass_cache) {
-        for (size_t i = 0; i < tlb_cache.size(); i++) {
-            const auto entry = tlb_cache[i];
-
-            if (entry.IsInPage(phys_addr)) {
-                tlb_cache.erase(tlb_cache.begin() + i);
-                tlb_cache.push_back(entry);
-                return entry;
-            }
-        }
-
-        if (tlb_cache.size() == TLB_CACHE_SIZE) {
-            tlb_cache.erase(tlb_cache.begin());
-        }
-    }
-
-    table_addr = (table_addr & 0x3fffff) * 0x1000;
-
-    auto table = memory.Read(table_addr, 1024);
-    uint32_t table_index = (phys_addr >> 12) & 0x3ff;
-
-    auto table_entry_address = table;
-
-    TLBEntry entry = TLBEntry::CreateNonVirtual(*this);
+    
 }
 
 size_t VirtualMachine::GetInstructionsPerSecond() {
@@ -1766,11 +1805,8 @@ bool VirtualMachine::IsBreakPoint(uint32_t addr) {
     if (break_points.contains(addr)) return true;
 
     RVInstruction instr = RVInstruction::FromUInt32(memory.Read32(addr));
-    if (instr.opcode == RVInstruction::OP_SYSTEM &&
-        instr.func3 == RVInstruction::FUNC3_SYSTEM &&
-        instr.immediate == RVInstruction::IMM_EBREAK) return true;
-    
-    return false;
+
+    return instr.type == RVInstruction::Type::EBREAK;
 }
 
 void VirtualMachine::UpdateTime() {
