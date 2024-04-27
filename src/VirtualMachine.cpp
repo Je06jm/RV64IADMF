@@ -1017,7 +1017,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                     break;
                 }
 
-                bool lhs_less;
+                bool lhs_less = false;
                 if (lhs_nan) {
                     lhs_less = false;
                     SetFloatFlags(true, false, false, false, false);
@@ -1055,7 +1055,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                     break;
                 }
 
-                bool lhs_less;
+                bool lhs_less = false;
                 if (lhs_nan) {
                     lhs_less = false;
                     SetFloatFlags(true, false, false, false, false);
@@ -1464,7 +1464,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                     break;
                 }
 
-                bool lhs_less;
+                bool lhs_less = false;
                 if (lhs_nan) {
                     lhs_less = false;
                     SetFloatFlags(true, false, false, false, false);
@@ -1502,7 +1502,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                     break;
                 }
 
-                bool lhs_less;
+                bool lhs_less = false;
                 if (lhs_nan) {
                     lhs_less = false;
                     SetFloatFlags(true, false, false, false, false);
