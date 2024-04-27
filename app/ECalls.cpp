@@ -8,7 +8,7 @@
 
 using VM = VirtualMachine;
 
-void BuiltinECallCOut(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
+void ECallCOut(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
     std::string str = "";
 
     for (uint32_t addr = regs[VM::REG_A1], i = 0; i < regs[VM::REG_A2]; addr++, i++) {
@@ -19,7 +19,7 @@ void BuiltinECallCOut(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& 
     std::cout << str << std::flush;
 }
 
-void BuiltinECallCIn(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
+void ECallCIn(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
     std::string str = "";
 
     if (!std::getline(std::cin, str)) {
@@ -35,7 +35,7 @@ void BuiltinECallCIn(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& r
     regs[VM::REG_A0] = i;
 }
 
-void BuiltinECallExit(Memory&, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
+void ECallExit(Memory&, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
     union S32U32 {
         uint32_t u;
         int32_t s;
@@ -46,8 +46,8 @@ void BuiltinECallExit(Memory&, std::array<uint32_t, VM::REGISTER_COUNT>& regs, s
     std::exit(value.s);
 }
 
-void RegisterBuiltinECalls() {
-    VM::RegisterECall(ECALL_COUT, BuiltinECallCOut);
-    VM::RegisterECall(ECALL_CIN, BuiltinECallCIn);
-    VM::RegisterECall(ECALL_EXIT, BuiltinECallExit);
+void RegisterECalls() {
+    VM::RegisterECall(ECALL_COUT, ECallCOut);
+    VM::RegisterECall(ECALL_CIN, ECallCIn);
+    VM::RegisterECall(ECALL_EXIT, ECallExit);
 }

@@ -5,7 +5,6 @@
 #include <Memory.hpp>
 #include <VirtualMachine.hpp>
 #include <RV32I.hpp>
-#include <ECalls.hpp>
 
 #include <GUIMemoryViewer.hpp>
 #include <GUIAssembly.hpp>
@@ -21,6 +20,8 @@
 #include <string>
 #include <vector>
 
+#include "ECalls.hpp"
+
 int main(int argc, const char** argv) {
     std::vector<std::string> args;
 
@@ -34,7 +35,8 @@ int main(int argc, const char** argv) {
     }
 
     RVInstruction::SetupCSRNames();
-    RegisterBuiltinECalls();
+    
+    RegisterECalls();
 
     Window window("RV32IMF", 800, 600);
 
