@@ -35,6 +35,10 @@ void ECallCIn(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, st
     regs[VM::REG_A0] = i;
 }
 
+void ECallGetMemorySize(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
+    regs[VM::REG_A0] = memory.GetTotalMemory();
+}
+
 void ECallExit(Memory&, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::array<Float, VM::REGISTER_COUNT>&) {
     union S32U32 {
         uint32_t u;
@@ -49,5 +53,6 @@ void ECallExit(Memory&, std::array<uint32_t, VM::REGISTER_COUNT>& regs, std::arr
 void RegisterECalls() {
     VM::RegisterECall(ECALL_COUT, ECallCOut);
     VM::RegisterECall(ECALL_CIN, ECallCIn);
+    VM::RegisterECall(ECALL_GET_MEMORY_SIZE, ECallGetMemorySize);
     VM::RegisterECall(ECALL_EXIT, ECallExit);
 }
