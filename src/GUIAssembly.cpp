@@ -8,34 +8,6 @@
 #include <format>
 
 void GUIAssembly::Draw() {
-    {
-        uint32_t pc = vm.GetPC();
-
-        bool needs_scroll = pc != last_pc;
-        last_pc = pc;
-
-        int64_t window_begin = (pc >> 2) - WINDOW / 2 + WINDOW_SLIDE;
-
-        if (window_begin < 0) window_begin = 0;
-
-        int64_t window_end = window_begin + WINDOW;
-        int64_t window_end_pc = window_end << 2;
-
-        if (static_cast<uint32_t>(window_end_pc) >= memory.GetTotalMemory()) {
-            window_end = memory.GetTotalMemory() >> 2;
-            window_end_pc = window_end << 2;
-            window_begin = window_end - WINDOW;
-        }
-
-        if (window_begin < 0) {
-            throw std::runtime_error(std::format("Memory needs to be at least {} bytes in size", WINDOW << 2));
-        }
-
-        uint32_t window_pc = static_cast<uint32_t>(window_begin) << 2;
-    }
-    {
-        auto instrs = memory.Read(0, WINDOW);
-    }
     if (ImGui::Begin("Assembly")) {
         uint32_t pc = vm.GetPC();
 
