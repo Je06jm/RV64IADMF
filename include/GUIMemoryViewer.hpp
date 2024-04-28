@@ -7,6 +7,7 @@
 #include "GUIConstants.hpp"
 
 #include <string>
+#include <utility>
 
 class GUIMemoryViewer {
     Memory& memory;
@@ -30,13 +31,13 @@ class GUIMemoryViewer {
     void CreateStyle();
     void UpdateBuffer();
 
-    std::vector<uint32_t> data_buffer;
+    std::vector<std::pair<uint32_t, bool>> data_buffer;
     uint32_t read_address = 0;
 
     std::string text_input_buffer = "0";
 
 public:
-    GUIMemoryViewer(Memory& memory, VirtualMachine& vm);
+    GUIMemoryViewer(Memory& memory, VirtualMachine& vm, uint32_t read_address = 0);
     ~GUIMemoryViewer() = default;
 
     void Draw();

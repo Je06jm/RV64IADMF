@@ -41,9 +41,17 @@ int main(int argc, const char** argv) {
 
     Window window("RV32IMF", 800, 600);
 
-    Memory memory(2 * 1024 * 1024);
-    memory.ReadFileInto(args[0], 0);
-    VirtualMachine vm(memory, 0, 1000000, 0);
+    Memory memory;
+    {
+        auto rom = MemoryROM::Create({0x12345678}, 0);
+        memory.AddMemoryRegion(std::move(rom));
+    }
+    {
+        auto ram = MemoryRAM::Create(0x1000, 2 * 1024 * 1024);
+        memory.AddMemoryRegion(std::move(ram));
+    }
+    memory.ReadFileInto(args[0], 0x1000);
+    VirtualMachine vm(memory, 0x1000, 1000000, 0);
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -57,7 +65,7 @@ int main(int argc, const char** argv) {
     window.SetupImGui();
     ImGui_ImplOpenGL3_Init();
 
-    GUIMemoryViewer mem_viewer(memory, vm);
+    GUIMemoryViewer mem_viewer(memory, vm, 0x1000);
     GUIAssembly assembly(vm, memory);
     GUIInfo info(memory, vm);
     GUIRegs state(vm);

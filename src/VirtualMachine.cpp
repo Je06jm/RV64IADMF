@@ -15,9 +15,9 @@ bool VirtualMachine::TLBEntry::IsFlagsSet(uint32_t flags) const {
     assert(IsVirtual());
     
     if (IsMegaPage()) {
-        return (vm.memory.Read32(table) & flags) == flags;
+        return (vm.memory.ReadWord(table) & flags) == flags;
     } else {
-        return (vm.memory.Read32(table_entry) & flags) == flags;
+        return (vm.memory.ReadWord(table_entry) & flags) == flags;
     }
 }
 
@@ -25,11 +25,11 @@ void VirtualMachine::TLBEntry::SetFlags(uint32_t flags) {
     assert(IsVirtual());
 
     if (IsMegaPage()) {
-        auto data = vm.memory.Read32(table);
-        vm.memory.Write32(table, data | flags);
+        auto data = vm.memory.ReadWord(table);
+        vm.memory.WriteWord(table, data | flags);
     } else {
-        auto data = vm.memory.Read32(table_entry);
-        vm.memory.Write32(table_entry, data | flags);
+        auto data = vm.memory.ReadWord(table_entry);
+        vm.memory.WriteWord(table_entry, data | flags);
     }
 }
 
@@ -37,11 +37,11 @@ void VirtualMachine::TLBEntry::ClearFlgs(uint32_t flags) {
     assert(IsVirtual());
 
     if (IsMegaPage()) {
-        auto data = vm.memory.Read32(table);
-        vm.memory.Write32(table, data & ~flags);
+        auto data = vm.memory.ReadWord(table);
+        vm.memory.WriteWord(table, data & ~flags);
     } else {
-        auto data = vm.memory.Read32(table_entry);
-        vm.memory.Write32(table_entry, data & ~flags);
+        auto data = vm.memory.ReadWord(table_entry);
+        vm.memory.WriteWord(table_entry, data & ~flags);
     }
 }
 
@@ -266,7 +266,7 @@ VirtualMachine::~VirtualMachine() {
 
 bool VirtualMachine::Step(uint32_t steps) {
     auto InvalidInstruction = [&]() {
-        uint32_t instr = memory.Read32(pc);
+        uint32_t instr = memory.ReadWord(pc);
         throw std::runtime_error(std::format("Invalid instruction at 0x{:08x}: 0x{:08x}", pc, instr));
     };
 
@@ -396,7 +396,7 @@ bool VirtualMachine::Step(uint32_t steps) {
         if (pc & 0b11)
             throw std::runtime_error(std::format("Invalid PC address {:08x}", pc));
         
-        auto instr = RVInstruction::FromUInt32(memory.Read32(pc));
+        auto instr = RVInstruction::FromUInt32(memory.ReadWord(pc));
 
         switch (instr.type) {
             case Type::LUI:
@@ -482,35 +482,35 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::LB: 
-                regs[instr.rd] = SignExtend(memory.Read8(regs[instr.rs1] + instr.immediate), 7);
+                regs[instr.rd] = SignExtend(memory.ReadByte(regs[instr.rs1] + instr.immediate), 7);
                 break;
             
             case Type::LH:
-                regs[instr.rd] = SignExtend(memory.Read16(regs[instr.rs1] + instr.immediate), 15);
+                regs[instr.rd] = SignExtend(memory.ReadHalf(regs[instr.rs1] + instr.immediate), 15);
                 break;
             
             case Type::LW:
-                regs[instr.rd] = memory.Read32(regs[instr.rs1] + instr.immediate);
+                regs[instr.rd] = memory.ReadWord(regs[instr.rs1] + instr.immediate);
                 break;
 
             case Type::LBU:
-                regs[instr.rd] = memory.Read8(regs[instr.rs1] + instr.immediate);
+                regs[instr.rd] = memory.ReadByte(regs[instr.rs1] + instr.immediate);
                 break;
             
             case Type::LHU:
-                regs[instr.rd] = memory.Read16(regs[instr.rs1] + instr.immediate);
+                regs[instr.rd] = memory.ReadHalf(regs[instr.rs1] + instr.immediate);
                 break;
             
             case Type::SB:
-                memory.Write8(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+                memory.WriteByte(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
                 break;
             
             case Type::SH:
-                memory.Write16(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+                memory.WriteHalf(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
                 break;
             
             case Type::SW:
-                memory.Write32(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+                memory.WriteWord(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
                 break;
             
             case Type::ADDI:
@@ -761,11 +761,11 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::LR_W:
                 if (instr.rs2 != 0) InvalidInstruction();
-                regs[instr.rd] = memory.Read32Reserved(regs[instr.rs1], csrs[CSR_MHARTID]);
+                regs[instr.rd] = memory.ReadWordReserved(regs[instr.rs1], csrs[CSR_MHARTID]);
                 break;
             
             case Type::SC_W:
-                if (memory.Write32Conditional(regs[instr.rs1], regs[instr.rs2], csrs[CSR_MHARTID]))
+                if (memory.WriteWordConditional(regs[instr.rs1], regs[instr.rs2], csrs[CSR_MHARTID]))
                     regs[instr.rd] = 0;
                 
                 else
@@ -810,11 +810,11 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             case Type::FLW:
-                fregs[instr.rd] = ToFloat(memory.Read32(regs[instr.rs1] + instr.immediate));
+                fregs[instr.rd] = ToFloat(memory.ReadWord(regs[instr.rs1] + instr.immediate));
                 break;
             
             case Type::FSW:
-                memory.Write32(regs[instr.rs1] + instr.immediate, ToUInt32(fregs[instr.rs2]));
+                memory.WriteWord(regs[instr.rs1] + instr.immediate, ToUInt32(fregs[instr.rs2]));
                 break;
             
             case Type::FMADD_S: {
@@ -1250,8 +1250,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FLD: {
                 auto addr = regs[instr.rs1] + instr.immediate;
-                uint64_t val = memory.Read32(addr);
-                val |= static_cast<uint64_t>(memory.Read32(addr + 4)) << 32;
+                uint64_t val = memory.ReadWord(addr);
+                val |= static_cast<uint64_t>(memory.ReadWord(addr + 4)) << 32;
                 fregs[instr.rd] = ToDouble(val);
                 break;
             }
@@ -1259,8 +1259,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FSD: {
                 auto addr = regs[instr.rs1] + instr.immediate;
                 auto val = ToUInt64(fregs[instr.rs2]);
-                memory.Write32(addr, static_cast<uint32_t>(val));
-                memory.Write32(addr + 4, static_cast<uint32_t>(val >> 32));
+                memory.WriteWord(addr, static_cast<uint32_t>(val));
+                memory.WriteWord(addr + 4, static_cast<uint32_t>(val >> 32));
                 break;
             }
             
@@ -1808,7 +1808,12 @@ size_t VirtualMachine::GetInstructionsPerSecond() {
 bool VirtualMachine::IsBreakPoint(uint32_t addr) {
     if (break_points.contains(addr)) return true;
 
-    RVInstruction instr = RVInstruction::FromUInt32(memory.Read32(addr));
+    auto word = memory.PeekWord(addr);
+
+    if (!word.second)
+        return false;
+
+    RVInstruction instr = RVInstruction::FromUInt32(word.first);
 
     return instr.type == RVInstruction::Type::EBREAK;
 }

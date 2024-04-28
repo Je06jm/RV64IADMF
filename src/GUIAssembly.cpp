@@ -33,17 +33,30 @@ void GUIAssembly::Draw() {
 
         uint32_t window_pc = static_cast<uint32_t>(window_begin) << 2;
 
-        auto instrs = memory.Read(window_pc, WINDOW);
+        auto instrs = memory.PeekWords(window_pc, WINDOW);
 
         for (uint32_t addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
-            RVInstruction instr = RVInstruction::FromUInt32(instrs[i]);
-            if (addr == pc) {
-                ImGui::TextColored(gui_pc_highlight_color, "-> 0x%08x %s", addr, std::string(instr).c_str());
-                if (needs_scroll) ImGui::SetScrollHereY();
-            } else if (vm.IsBreakPoint(addr)) {
-                ImGui::TextColored(gui_break_highlight_color, "   0x%08x %s", addr, std::string(instr).c_str());
-            } else {
-                ImGui::Text("   0x%08x %s", addr, std::string(instr).c_str());
+            if (instrs[i].second) {
+                RVInstruction instr = RVInstruction::FromUInt32(instrs[i].first);
+                if (addr == pc) {
+                    ImGui::TextColored(gui_pc_highlight_color, "-> 0x%08x %s", addr, std::string(instr).c_str());
+                    if (needs_scroll) ImGui::SetScrollHereY();
+                } else if (vm.IsBreakPoint(addr)) {
+                    ImGui::TextColored(gui_break_highlight_color, "   0x%08x %s", addr, std::string(instr).c_str());
+                } else {
+                    ImGui::Text("   0x%08x %s", addr, std::string(instr).c_str());
+                }
+            }
+            else {
+                if (addr == pc) {
+                    ImGui::TextColored(gui_pc_highlight_color, "-> Unmapped Memory");
+                    if (needs_scroll) ImGui::SetScrollHereY();
+                }
+                else if (vm.IsBreakPoint(addr))
+                    ImGui::TextColored(gui_break_highlight_color, "   Unmapped Memory");
+                
+                else
+                    ImGui::Text("   Unmapped Memory");
             }
         }
     }

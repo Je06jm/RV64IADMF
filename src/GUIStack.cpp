@@ -27,13 +27,22 @@ void GUIStack::Draw() {
 
         uint32_t window_pc = static_cast<uint32_t>(window_begin) << 2;
 
-        auto values = memory.Read(window_pc, WINDOW);
+        auto values = memory.PeekWords(window_pc, WINDOW);
 
         for (uint32_t addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
-            if (addr == sp) {
-                ImGui::TextColored(gui_sp_highlight_color, "-> 0x%08x : 0x%08x (%i)", addr, values[i], values[i]);
-            } else {
-                ImGui::Text("   0x%08x : 0x%08x (%i)", addr, values[i], values[i]);
+            if (values[i].second) {
+                if (addr == sp) {
+                    ImGui::TextColored(gui_sp_highlight_color, "-> 0x%08x : 0x%08x (%i)", addr, values[i].first, values[i].first);
+                } else {
+                    ImGui::Text("   0x%08x : 0x%08x (%i)", addr, values[i].first, values[i].first);
+                }
+            }
+            else {
+                if (addr == sp)
+                    ImGui::TextColored(gui_sp_highlight_color, "-> Unmapped memory");
+                
+                else
+                    ImGui::Text("   Unmapped memory");
             }
         }
     }

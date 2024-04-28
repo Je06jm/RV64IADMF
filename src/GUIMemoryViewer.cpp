@@ -43,17 +43,17 @@ void GUIMemoryViewer::CreateStyle() {
 
 void GUIMemoryViewer::UpdateBuffer() {
     uint64_t end_address = static_cast<uint64_t>(read_address) + Memory::PAGE_SIZE;
-    end_address = end_address < memory.max_address ? end_address : memory.max_address;
+    end_address = end_address < memory.GetMaxAddress() ? end_address : memory.GetMaxAddress();
     
-    if (read_address >= memory.max_address) {
+    if (read_address >= memory.GetMaxAddress()) {
         data_buffer.clear();
         return;
     }
     
-    data_buffer = memory.Read(read_address, (end_address - read_address) / sizeof(uint32_t));
+    data_buffer = memory.PeekWords(read_address, (end_address - read_address) / sizeof(uint32_t));
 }
 
-GUIMemoryViewer::GUIMemoryViewer(Memory& memory, VirtualMachine& vm) : memory{memory}, vm{vm} {
+GUIMemoryViewer::GUIMemoryViewer(Memory& memory, VirtualMachine& vm, uint32_t read_address) : memory{memory}, vm{vm}, read_address{read_address} {
     UpdateBuffer();
 }
 
@@ -118,22 +118,32 @@ void GUIMemoryViewer::Draw() {
                         ImGui::SameLine(ascii_pos_x);
                         ImGui::Text(" ");
                     } else {
-                        uint32_t value = data_buffer[byte_index >> 2];
-                        uint8_t byte = value >> (8 * (byte_index & 0b11));
+                        if (data_buffer[byte_index >> 2].second) {
+                            uint32_t value = data_buffer[byte_index >> 2].first;
+                            uint8_t byte = value >> (8 * (byte_index & 0b11));
 
-                        if (addr + c == vm.GetPC()) {
-                            ImGui::TextColored(gui_pc_highlight_color, "%02x", byte);
-                        } else if (addr + c == vm.GetSP()) {
-                            ImGui::TextColored(gui_sp_highlight_color, "%02x", byte);
-                        } else {
-                            ImGui::Text("%02x", byte);
+                            if (addr + c == vm.GetPC()) {
+                                ImGui::TextColored(gui_pc_highlight_color, "%02x", byte);
+                            } else if (addr + c == vm.GetSP()) {
+                                ImGui::TextColored(gui_sp_highlight_color, "%02x", byte);
+                            } else {
+                                ImGui::Text("%02x", byte);
+                            }
+
+                            ImGui::SameLine(ascii_pos_x);
+                            if (byte >= 32 && byte < 127) {
+                                ImGui::Text("%c", byte);
+                            } else {
+                                ImGui::Text(".");
+                            }
                         }
-
-                        ImGui::SameLine(ascii_pos_x);
-                        if (byte >= 32 && byte < 127) {
-                            ImGui::Text("%c", byte);
-                        } else {
-                            ImGui::Text(".");
+                        else {
+                            if (addr + c == vm.GetPC())
+                                ImGui::TextColored(gui_pc_highlight_color, "xx");
+                            else if (addr + c == vm.GetSP())
+                                ImGui::TextColored(gui_sp_highlight_color, "xx");
+                            else
+                                ImGui::Text("xx");
                         }
                     }
                 }
@@ -164,7 +174,7 @@ void GUIMemoryViewer::Draw() {
             } catch (...) {
 
             }
-            aligned_address = aligned_address < memory.max_address ? aligned_address : (memory.max_address - COLUMNS);
+            aligned_address = aligned_address < memory.GetMaxAddress() ? aligned_address : (memory.GetMaxAddress() - COLUMNS);
             aligned_address &= ~0xf;
 
             read_address = aligned_address;
