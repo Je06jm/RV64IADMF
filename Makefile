@@ -70,7 +70,9 @@ all: library $(APP_OBJS)
 	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O2
 
 debug: CXX_FLAGS += $(APP_FLAGS)
-debug: debug_library $(APP_OBJS)
+debug: debug_library
+debug: CXX_FLAGS += -g
+debug: $(APP_OBJS)
 	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O2
 
 bios: $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS) $(BIOS_CC_HEADERS)
@@ -81,6 +83,7 @@ clean:
 	@-rm $(PROGRAM)
 	@-rm $(CXX_OBJS)
 	@-rm $(CC_OBJS)
+	@-rm $(APP_OBJS)
 	@-rm $(LIBRARY)
 
 clean_bios:
