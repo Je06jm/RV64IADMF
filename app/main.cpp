@@ -11,6 +11,7 @@
 #include <GUIInfo.hpp>
 #include <GUIRegs.hpp>
 #include <GUIStack.hpp>
+#include <GUICSR.hpp>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -61,6 +62,7 @@ int main(int argc, const char** argv) {
     GUIInfo info(memory, vm);
     GUIRegs state(vm);
     GUIStack stack(vm, memory);
+    GUICSR csr(vm);
 
     vm.Start();
     delta_time.Update();
@@ -84,6 +86,7 @@ int main(int argc, const char** argv) {
         info.Draw();
         state.Draw();
         stack.Draw();
+        csr.Draw();
 
         if (ImGui::IsKeyPressed(ImGuiKey_Space, false))
             auto_run = !auto_run;

@@ -21,6 +21,37 @@ public:
     static constexpr size_t REGISTER_COUNT = 32;
 
 private:
+    static constexpr uint8_t MACHINE_MODE = 0b00;
+    static constexpr uint8_t SUPERVISOR_MODE = 0b01;
+    static constexpr uint8_t USER_MODE = 0b10;
+
+    static constexpr uint32_t ISA_BITS_MASK = 0b11 << 30;
+    static constexpr uint32_t ISA_32_BITS = 1 << 30;
+
+    static constexpr uint32_t ISA_A = 1<<0;
+    static constexpr uint32_t ISA_D = 1<<3;
+    static constexpr uint32_t ISA_F = 1<<5;
+    static constexpr uint32_t ISA_I = 1<<8;
+    static constexpr uint32_t ISA_M = 1<<12;
+    static constexpr uint32_t ISA_S = 1<<18;
+    static constexpr uint32_t ISA_U = 1<<20;
+
+    std::array<uint32_t, REGISTER_COUNT> regs;
+    std::array<Float, REGISTER_COUNT> fregs;
+
+    std::unordered_map<uint32_t, uint32_t> csrs;
+
+    bool CSRPrivilegeCheck(uint32_t csr);
+    uint32_t ReadCSR(uint32_t csr, bool is_internal_read = false);
+    void WriteCSR(uint32_t csr, uint32_t value);
+
+    static const int default_rounding_mode;
+    bool ChangeRoundingMode(uint8_t rm = 0xff);
+    bool CheckFloatErrors();
+
+    static constexpr size_t TLB_CACHE_SIZE = 16;
+
+public:
     static constexpr uint16_t CSR_FFLAGS = 0x001;
     static constexpr uint16_t CSR_FRM = 0x002;
     static constexpr uint16_t CSR_FCSR = 0x003;
@@ -38,7 +69,7 @@ private:
     static constexpr uint16_t CSR_INSTRET = 0xc02;
     
     static constexpr uint16_t CSR_PERF_COUNTER_MAX = 32;
-    static constexpr uint16_t CSR_HPMCOUNTER = 0xc04;
+    static constexpr uint16_t CSR_HPMCOUNTER = 0xc03;
 
     static constexpr uint16_t CSR_CYCLEH = 0xc80;
     static constexpr uint16_t CSR_TIMEH = 0xc81;
@@ -83,53 +114,23 @@ private:
     static constexpr uint16_t CSR_MSECCFG = 0x747;
     static constexpr uint16_t CSR_MSECCFGH = 0x757;
     
-    static constexpr uint16_t CSR_PMP_MAX = 64;
+    static constexpr uint16_t CSR_PMPCFG_MAX = 16;
     static constexpr uint16_t CSR_PMPCFG0 = 0x3a0;
+
+    static constexpr uint16_t CSR_PMPADDR_MAX = 64;
+    static constexpr uint16_t CSR_PMPADDR0 = 0x3b0;
 
     static constexpr uint16_t CSR_MCYCLE = 0xb00;
     static constexpr uint16_t CSR_MINSTRET = 0xb02;
-    static constexpr uint16_t CSR_HPMCOUNTER3 = 0xb03;
+    static constexpr uint16_t CSR_MHPMCOUNTER3 = 0xb03;
+    static constexpr uint16_t CSR_MCYCLEH = 0xb80;
+    static constexpr uint16_t CSR_MINSTRETH = 0xb82;
+    static constexpr uint16_t CSR_MHPMCOUNTER3H = 0xb83;
     static constexpr uint16_t CSR_MCOUNTINHIBIT = 0x320;
 
     static constexpr uint16_t CSR_PERFORMANCE_EVENT_MAX = 32;
     static constexpr uint16_t CSR_MHPMEVENT3 = 0x323;
-    static constexpr uint16_t CSR_TSELECT = 0x7a0;
-    static constexpr uint16_t CSR_TDATA1 = 0x7a1;
-    static constexpr uint16_t CSR_TDATA2 = 0x7a2;
-    static constexpr uint16_t CSR_TDATA3 = 0x7a3;
-    static constexpr uint16_t CSR_MCONTEXT = 0x7a8;
 
-    static constexpr uint8_t MACHINE_MODE = 0b00;
-    static constexpr uint8_t SUPERVISOR_MODE = 0b01;
-    static constexpr uint8_t USER_MODE = 0b10;
-
-    static constexpr uint32_t ISA_BITS_MASK = 0b11 << 30;
-    static constexpr uint32_t ISA_32_BITS = 1 << 30;
-
-    static constexpr uint32_t ISA_A = 1<<0;
-    static constexpr uint32_t ISA_D = 1<<3;
-    static constexpr uint32_t ISA_F = 1<<5;
-    static constexpr uint32_t ISA_I = 1<<8;
-    static constexpr uint32_t ISA_M = 1<<12;
-    static constexpr uint32_t ISA_S = 1<<18;
-    static constexpr uint32_t ISA_U = 1<<20;
-
-    std::array<uint32_t, REGISTER_COUNT> regs;
-    std::array<Float, REGISTER_COUNT> fregs;
-
-    std::unordered_map<uint32_t, uint32_t> csrs;
-
-    bool CSRPrivilegeCheck(uint32_t csr);
-    uint32_t ReadCSR(uint32_t csr, bool is_internal_read = false);
-    void WriteCSR(uint32_t csr, uint32_t value);
-
-    static const int default_rounding_mode;
-    bool ChangeRoundingMode(uint8_t rm = 0xff);
-    bool CheckFloatErrors();
-
-    static constexpr size_t TLB_CACHE_SIZE = 16;
-
-public:
     static constexpr size_t REG_ZERO = 0;
     static constexpr size_t REG_RA = 1;
     static constexpr size_t REG_SP = 2;
@@ -284,6 +285,7 @@ public:
     bool Step(uint32_t steps = 1000);
 
     void GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, uint32_t& pc);
+    void GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs) const;
 
     inline uint32_t GetPC() const {
         return pc;

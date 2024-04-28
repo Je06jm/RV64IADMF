@@ -1785,6 +1785,10 @@ void VirtualMachine::GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers
     pc = this->pc;
 }
 
+void VirtualMachine::GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs) const {
+    csrs = this->csrs;
+}
+
 VirtualMachine::TLBEntry VirtualMachine::GetTLBLookup(uint32_t phys_addr, bool bypass_cache) {
     
 }
