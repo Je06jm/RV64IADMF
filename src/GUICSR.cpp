@@ -1,6 +1,4 @@
-#include "GUICSR.hpp"
-
-#include "GUIConstants.hpp"
+#include <GUICSR.hpp>
 
 #include <imgui.h>
 

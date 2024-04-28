@@ -1,6 +1,6 @@
-#include "GUIStack.hpp"
+#include <GUIStack.hpp>
 
-#include "GUIConstants.hpp"
+#include <GUIConstants.hpp>
 
 #include <imgui.h>
 

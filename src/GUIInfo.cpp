@@ -1,4 +1,4 @@
-#include "GUIInfo.hpp"
+#include <GUIInfo.hpp>
 
 #include <imgui.h>
 
