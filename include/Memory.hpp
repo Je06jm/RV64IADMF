@@ -160,7 +160,7 @@ public:
     void AddMemoryRegion(std::shared_ptr<T> region) {
         static_assert(std::is_base_of_v<MemoryRegion, T>);
 
-        auto mem_region = std::shared_ptr<MemoryRegion>(static_cast<MemoryRegion*>(region.get()));
+        auto mem_region = std::shared_ptr<MemoryRegion>(region);
 
         uint32_t end = mem_region->base + mem_region->size;
         memory_size += mem_region->size;
@@ -175,7 +175,7 @@ public:
     void AddMemoryRegion(std::unique_ptr<T>&& region) {
         static_assert(std::is_base_of_v<MemoryRegion, T>);
 
-        auto mem_region = std::shared_ptr<MemoryRegion>(static_cast<MemoryRegion*>(region.release()));
+        auto mem_region = std::shared_ptr<MemoryRegion>(region.release());
 
         uint32_t end = mem_region->base + mem_region->size;
         memory_size += mem_region->size;
