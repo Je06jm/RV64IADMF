@@ -13,7 +13,7 @@ void ECallCOut(Memory& memory, std::array<uint32_t, VM::REGISTER_COUNT>& regs, s
 
     for (uint32_t addr = regs[VM::REG_A1], i = 0; i < regs[VM::REG_A2]; addr++, i++) {
         uint8_t byte = memory.Read8(addr);
-        str += static_cast<const char>(byte);
+        str += static_cast<char>(byte);
     }
 
     std::cout << str << std::flush;
