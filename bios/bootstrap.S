@@ -9,7 +9,15 @@ _start:
     li t0, 1
     la sp, stack_top
 
-    li a0, 1
+    csrr t0, mvendorid
+    csrr t1, marchid
+    csrr t2, mimpid
+
+    la t3, argv_0
+    sw t1, 0(t3)
+    sw t2, 4(t3)
+
+    li a0, 2
     la a1, argv
     call main
 
@@ -40,10 +48,13 @@ machine_break:
 .data
 
 .align 4
-argv_0: .string "bios.elf"
+argv_0: .string "            "
 
 .align 4
-argv: .word argv_0, 0
+argv_1: .string "bios.elf"
+
+.align 4
+argv: .word argv_0, argv_1, 0
 
 .bss
 

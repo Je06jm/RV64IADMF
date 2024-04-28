@@ -1,29 +1,17 @@
 #include "printf.h"
-
 #include "input.h"
-
-#include "machine.h"
+#include "phys_memory.h"
 
 #define INPUT_BUFFER_SIZE 8
 
 int main(int argc, const char** argv) {
-    char buffer[INPUT_BUFFER_SIZE];
-    
-    printf("What is your name? ");
-    int chars = read_input(buffer, INPUT_BUFFER_SIZE);
+    printf("%i args\n", argc);
 
-    if ((chars + 1) >= INPUT_BUFFER_SIZE) {
-        printf("Could not read input as it is too big for the buffer\n");
-        return -1;
+    for (int i = 0; i < argc; i++) {
+        printf("\t%i %s\n", i, argv[i]);
     }
 
-    else if (chars == 0) {
-        printf("An empty name was put in. Aborting\n");
-        return -2;
-    }
-
-    buffer[chars] = 0;
-    printf("Nice to meet you %s!\n", buffer);
+    phys_setup();
 
     return 0;
 }

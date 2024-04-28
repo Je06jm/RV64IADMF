@@ -5,11 +5,13 @@ ENTRY(_start)
 
 MEMORY
 {
-    ram (rwx) : ORIGIN = 0x00000000, LENGTH = 512K
+    ram (rwx) : ORIGIN = 0x00001000, LENGTH = 512K
 }
 
 SECTIONS
 {
+    img_begin = .;
+
     .bootstrap :
     {
         *(.bootstrap)
@@ -34,6 +36,8 @@ SECTIONS
     {
         *(.bss)
     } > ram
+
+    img_end = .;
 
     /DISCARD/ :
     {
