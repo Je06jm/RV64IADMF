@@ -89,7 +89,7 @@ public:
     static constexpr size_t WORDS_PER_PAGE = PAGE_SIZE / sizeof(uint32_t);
 
 private:
-    std::vector<std::unique_ptr<MemoryRegion>> regions;
+    std::vector<std::shared_ptr<MemoryRegion>> regions;
 
     mutable std::unordered_map<uint32_t, uint32_t> reservations;
     mutable std::mutex lock;
@@ -157,10 +157,25 @@ public:
     }
 
     template <typename T>
+    void AddMemoryRegion(std::shared_ptr<T> region) {
+        static_assert(std::is_base_of_v<MemoryRegion, T>);
+
+        auto mem_region = std::shared_ptr<MemoryRegion>(static_cast<MemoryRegion*>(region.get()));
+
+        uint32_t end = mem_region->base + mem_region->size;
+        memory_size += mem_region->size;
+
+        regions.emplace_back(std::move(mem_region));
+
+        if (end > max_address)
+            max_address = end;
+    }
+
+    template <typename T>
     void AddMemoryRegion(std::unique_ptr<T>&& region) {
         static_assert(std::is_base_of_v<MemoryRegion, T>);
 
-        auto mem_region = std::unique_ptr<MemoryRegion>(static_cast<MemoryRegion*>(region.release()));
+        auto mem_region = std::shared_ptr<MemoryRegion>(static_cast<MemoryRegion*>(region.release()));
 
         uint32_t end = mem_region->base + mem_region->size;
         memory_size += mem_region->size;
