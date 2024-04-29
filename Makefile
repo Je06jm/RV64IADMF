@@ -1,5 +1,5 @@
 LD = g++
-LD_FLAGS = -Llibs -lglfw3dll
+LD_FLAGS = -Llibs -lglfw3dll -lWs2_32
 
 AR = ar
 AR_FLAGS = rvs
@@ -57,7 +57,7 @@ BIOS = bios
 %.rv_o: %.S $(BIOS_CC_HEADERS)
 	$(BIOS_CC) $(BIOS_CC_FLAGS) -c $< -o $@
 
-library: CXX_FLAGS += -O2
+library: CXX_FLAGS += -O3
 library: $(CXX_OBJS) $(CC_OBJS) $(CXX_HEADERS)
 	$(AR) $(AR_FLAGS) $(LIBRARY) $(CXX_OBJS) $(CC_OBJS)
 
@@ -67,7 +67,7 @@ debug_library: $(CXX_OBJS) $(CC_OBJS) $(CXX_HEADERS)
 
 all: CXX_FLAGS += $(APP_FLAGS)
 all: library $(APP_OBJS)
-	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O2
+	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O3
 
 debug: CXX_FLAGS += $(APP_FLAGS)
 debug: debug_library
