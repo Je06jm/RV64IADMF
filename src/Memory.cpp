@@ -103,9 +103,7 @@ uint32_t Memory::ReadWord(uint32_t address) const {
     if (!region->readable)
         throw std::runtime_error(std::format("Cannot read address {:#10x} as it's unreadable", address));
 
-    region->Lock();
     auto word = region->ReadWord(address - region->base);
-    region->Unlock();
 
     return word;
 }
@@ -125,9 +123,7 @@ uint16_t Memory::ReadHalf(uint32_t address) const {
     if (!region->readable)
         throw std::runtime_error(std::format("Cannot read address {:#10x} as it's unreadable", address));
 
-    region->Lock();
     auto half = region->ReadHalf(address - region->base);
-    region->Unlock();
 
     return half;
 }
@@ -144,9 +140,7 @@ uint8_t Memory::ReadByte(uint32_t address) const {
     if (!region->readable)
         throw std::runtime_error(std::format("Cannot read address {:#10x} as it's unreadable", address));
 
-    region->Lock();
     auto byte = region->ReadByte(address - region->base);
-    region->Unlock();
 
     return byte;
 }
@@ -163,9 +157,7 @@ std::pair<uint32_t, bool> Memory::PeekWord(uint32_t address) const {
     if (!region->readable)
         return {0, false};
     
-    region->Lock();
     auto word = region->ReadWord(address - region->base);
-    region->Unlock();
 
     return {word, true};
 }
@@ -185,9 +177,7 @@ void Memory::WriteWord(uint32_t address, uint32_t word) {
     if (!region->writable)
         throw std::runtime_error(std::format("Cannot write address {:#10x} as it's unwritable", address));
 
-    region->Lock();
     region->WriteWord(address - region->base, word);
-    region->Unlock();
 }
 
 void Memory::WriteHalf(uint32_t address, uint16_t half) {
@@ -205,9 +195,7 @@ void Memory::WriteHalf(uint32_t address, uint16_t half) {
     if (!region->writable)
         throw std::runtime_error(std::format("Cannot write address {:#10x} as it's unwritable", address));
     
-    region->Lock();
     region->WriteHalf(address - region->base, half);
-    region->Unlock();
 }
 
 void Memory::WriteByte(uint32_t address, uint8_t byte) {
@@ -222,9 +210,7 @@ void Memory::WriteByte(uint32_t address, uint8_t byte) {
     if (!region->writable)
         throw std::runtime_error(std::format("Cannot write address {:#10x} as it's unwritable", address));
     
-    region->Lock();
     region->WriteByte(address - region->base, byte);
-    region->Unlock();
 }
 
 uint32_t Memory::AtomicSwap(uint32_t address, uint32_t word) {
@@ -539,6 +525,7 @@ bool Memory::WriteWordConditional(uint32_t address, uint32_t value, uint32_t cpu
     }
 
     if (reservations[cpu_id] != (address & ~0b11)) {
+        auto addr = reservations[cpu_id];
         lock.unlock();
         return false;
     }
