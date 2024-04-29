@@ -21,7 +21,9 @@
 #include <vector>
 #include <thread>
 
+#include "GDB.hpp"
 #include "ECalls.hpp"
+#include "ArgsParser.hpp"
 #include "Framebuffer.hpp"
 #include "VirtualMachines.hpp"
 
@@ -32,16 +34,27 @@ int main(int argc, const char** argv) {
     framebuffer_width = 800;
     framebuffer_height = 600;
 
+    uint32_t cores = 2;
+
     std::vector<std::string> args;
 
     for (int i = 1; i < argc; i++) {
         args.push_back(argv[i]);
     }
+
+    // Process command line args
+    ArgsParser args_parser(args);
+
+    cores = args_parser.GetValueOr<uint32_t>("cores", 1);
     
-    if (args.size() != 1) {
-        std::cout << "Usage: RV32IMF.exe <bios-file.bin>" << std::endl;
-        return 0;
+    if (!args_parser.HasValue("bios_file")) {
+        std::cerr << "--bios_file is required" << std::endl;
+        return -1;
     }
+
+    auto bios_path = args_parser.GetValue<std::string>("bios_file");
+
+    if (cores == 0) cores = 1;
 
     RVInstruction::SetupCSRNames();
     
@@ -51,19 +64,22 @@ int main(int argc, const char** argv) {
     {
         Memory memory;
         {
-            auto rom = MemoryROM::Create({0x12345678}, 0);
-            memory.AddMemoryRegion(std::move(rom));
-        }
-        {
-            auto ram = MemoryRAM::Create(0x1000, 2 * 1024 * 1024);
+            auto ram = MemoryRAM::Create(0, 2 * 1024 * 1024);
             memory.AddMemoryRegion(std::move(ram));
         }
-        memory.ReadFileInto(args[0], 0x1000);
+        memory.ReadFileInto(bios_path, 0);
 
         auto framebuffer = MemoryFramebuffer::Create(0x10000000, framebuffer_width, framebuffer_height);
         memory.AddMemoryRegion(framebuffer);
 
-        vms.emplace_back(memory, 0x1000, 0);
+        std::vector<uint32_t> harts;
+        for (uint32_t i = 0; i < cores; i++) {
+            vms.push_back(std::make_shared<VirtualMachine>(memory, 0, i));
+            harts.push_back(i);
+        }
+
+        //GDBServer gdb_server(memory);
+        //gdb_server.Run(8000);
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -77,22 +93,36 @@ int main(int argc, const char** argv) {
         window.SetupImGui();
         ImGui_ImplOpenGL3_Init();
 
-        GUIMemoryViewer mem_viewer(memory, vms[0], 0x1000);
+        GUIMemoryViewer mem_viewer(memory, vms[0], 0x0);
         GUIAssembly assembly(vms[0], memory);
-        GUIInfo info(memory, vms[0]);
+        GUIInfo info(memory, vms[0], harts);
         GUIRegs state(vms[0]);
         GUIStack stack(vms[0], memory);
         GUICSR csr(vms[0]);
 
-        vms[0].Start();
+        for (auto vm : vms) {
+            vm->Pause();
+
+            if (args_parser.HasFlag("pause_on_break"))
+                vm->SetPauseOnBreak(true);
+            
+            if (args_parser.HasFlag("pause_on_restart"))
+                vm->SetPauseOnRestart(true);
+
+            vm->Start();
+        }
+
+        if (!args_parser.HasFlag("p"))
+            vms[0]->Unpause();
+
         delta_time.Update();
 
-        auto worker = std::jthread([&]() {
-            while (vms[0].IsRunning())
-                vms[0].Step();
-        });
-
-        bool auto_run = false;
+        std::vector<std::jthread> workers;
+        for (size_t i = 0; i < vms.size(); i++) {
+            workers.emplace_back(std::jthread([](size_t i) {
+                vms[i]->Run();
+            }, i));
+        }
 
         while (!window.ShouldClose()) {
             window.Update();
@@ -102,7 +132,26 @@ int main(int argc, const char** argv) {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
-            vms[0].UpdateTime();
+            auto vm = vms[info.GetSelectedHart()];
+            mem_viewer.vm = vm;
+            assembly.vm = vm;
+            info.vm = vm;
+            state.vm = vm;
+            stack.vm = vm;
+            csr.vm = vm;
+
+            vm->UpdateTime();
+
+            if (ImGui::IsKeyPressed(ImGuiKey_Space, false) && vm->IsPaused())
+                vm->Step(1);
+            
+            if (ImGui::IsKeyPressed(ImGuiKey_Enter, false)) {
+                if (vm->IsPaused())
+                    vm->Unpause();
+                
+                else
+                    vm->Pause();
+            }
 
             // Do rendering
 
@@ -128,6 +177,7 @@ int main(int argc, const char** argv) {
             }
         }
 
-        vms[0].Stop();
+        for (auto& vm : vms)
+            vm->Stop();
     }
 }
