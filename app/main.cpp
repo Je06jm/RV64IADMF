@@ -3,7 +3,6 @@
 #include <DeltaTime.hpp>
 
 #include <Memory.hpp>
-#include <VirtualMachine.hpp>
 #include <RV32I.hpp>
 
 #include <GUIMemoryViewer.hpp>
@@ -20,10 +19,19 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <thread>
 
 #include "ECalls.hpp"
+#include "Framebuffer.hpp"
+#include "VirtualMachines.hpp"
 
 int main(int argc, const char** argv) {
+    constexpr size_t window_width = 800;
+    constexpr size_t window_height = 600;
+    
+    framebuffer_width = 800;
+    framebuffer_height = 600;
+
     std::vector<std::string> args;
 
     for (int i = 1; i < argc; i++) {
@@ -39,82 +47,87 @@ int main(int argc, const char** argv) {
     
     RegisterECalls();
 
-    Window window("RV32IMF", 800, 600);
-
-    Memory memory;
+    Window window("RV32IMF", window_width, window_height);
     {
-        auto rom = MemoryROM::Create({0x12345678}, 0);
-        memory.AddMemoryRegion(std::move(rom));
-    }
-    {
-        auto ram = MemoryRAM::Create(0x1000, 2 * 1024 * 1024);
-        memory.AddMemoryRegion(std::move(ram));
-    }
-    memory.ReadFileInto(args[0], 0x1000);
-    VirtualMachine vm(memory, 0x1000, 1000000, 0);
+        Memory memory;
+        {
+            auto rom = MemoryROM::Create({0x12345678}, 0);
+            memory.AddMemoryRegion(std::move(rom));
+        }
+        {
+            auto ram = MemoryRAM::Create(0x1000, 2 * 1024 * 1024);
+            memory.AddMemoryRegion(std::move(ram));
+        }
+        memory.ReadFileInto(args[0], 0x1000);
 
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+        auto framebuffer = MemoryFramebuffer::Create(0x10000000, framebuffer_width, framebuffer_height);
+        memory.AddMemoryRegion(framebuffer);
 
-    ImGui::StyleColorsDark();
-    io.Fonts->AddFontDefault();
+        vms.emplace_back(memory, 0x1000, 0);
 
-    window.SetupImGui();
-    ImGui_ImplOpenGL3_Init();
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO();
+        io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
-    GUIMemoryViewer mem_viewer(memory, vm, 0x1000);
-    GUIAssembly assembly(vm, memory);
-    GUIInfo info(memory, vm);
-    GUIRegs state(vm);
-    GUIStack stack(vm, memory);
-    GUICSR csr(vm);
+        ImGui::StyleColorsDark();
+        io.Fonts->AddFontDefault();
 
-    vm.Start();
-    delta_time.Update();
+        window.SetupImGui();
+        ImGui_ImplOpenGL3_Init();
 
-    bool auto_run = false;
+        GUIMemoryViewer mem_viewer(memory, vms[0], 0x1000);
+        GUIAssembly assembly(vms[0], memory);
+        GUIInfo info(memory, vms[0]);
+        GUIRegs state(vms[0]);
+        GUIStack stack(vms[0], memory);
+        GUICSR csr(vms[0]);
 
-    while (!window.ShouldClose()) {
-        window.Update();
+        vms[0].Start();
         delta_time.Update();
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
+        auto worker = std::jthread([&]() {
+            while (vms[0].IsRunning())
+                vms[0].Step();
+        });
 
-        vm.UpdateTime();
+        bool auto_run = false;
 
-        // Do rendering
+        while (!window.ShouldClose()) {
+            window.Update();
+            delta_time.Update();
 
-        mem_viewer.Draw();
-        assembly.Draw();
-        info.Draw();
-        state.Draw();
-        stack.Draw();
-        csr.Draw();
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
 
-        if (ImGui::IsKeyPressed(ImGuiKey_Space, false))
-            auto_run = !auto_run;
+            vms[0].UpdateTime();
 
-        if (auto_run) {
-            if (vm.Step(10000)) auto_run = false;
+            // Do rendering
+
+            mem_viewer.Draw();
+            assembly.Draw();
+            info.Draw();
+            state.Draw();
+            stack.Draw();
+            csr.Draw();
             
-        } else
-            if (ImGui::IsKeyPressed(ImGuiKey_Enter, true))
-                if (vm.Step(1))
-                    std::cout << "Breakpoint" << std::endl;
-        
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+            assembly.Draw();
+            
+            framebuffer->DrawBuffer();
 
-        if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-            auto ctx = glfwGetCurrentContext();
-            ImGui::UpdatePlatformWindows();
-            ImGui::RenderPlatformWindowsDefault();
-            glfwMakeContextCurrent(ctx);
+            ImGui::Render();
+            ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+                auto ctx = glfwGetCurrentContext();
+                ImGui::UpdatePlatformWindows();
+                ImGui::RenderPlatformWindowsDefault();
+                glfwMakeContextCurrent(ctx);
+            }
         }
+
+        vms[0].Stop();
     }
 }

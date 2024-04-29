@@ -253,7 +253,6 @@ public:
     };
     
 private:
-
     std::vector<TLBEntry> tlb_cache;
 
     Memory& memory;
@@ -261,6 +260,7 @@ private:
     uint32_t pc;
 
     bool running = false;
+    bool paused = false;
     std::string err = "";
 
     std::set<uint32_t> break_points;
@@ -272,17 +272,21 @@ private:
     static constexpr size_t MAX_HISTORY = 15;
 
 public:
-    const size_t instructions_per_second;
-    VirtualMachine(Memory& memory, uint32_t starting_pc, size_t instructions_per_second, uint32_t hart_id);
+    VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t hart_id);
     VirtualMachine(const VirtualMachine&) = delete;
-    VirtualMachine(VirtualMachine&&) = delete;
+    VirtualMachine(VirtualMachine&&);
     ~VirtualMachine();
     
     inline void Start() { running = true; }
     inline bool IsRunning() const { return running; }
     inline void Stop() { running = false; }
 
+    inline void Pause() { paused = true; }
+    inline bool IsPaused() { return paused; }
+    inline void Unpause() { paused = false; }
+
     bool Step(uint32_t steps = 1000);
+    void Run();
 
     void GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, uint32_t& pc);
     void GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs) const;
