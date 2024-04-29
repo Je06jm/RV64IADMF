@@ -9,10 +9,10 @@
 #include <cmath>
 #include <fenv.h>
 
-#include <iostream>
-
-#ifdef _WIN32
+#if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
+#else
+#include <sched.h>
 #endif
 
 const int VirtualMachine::default_rounding_mode = fegetround();
@@ -277,11 +277,13 @@ VirtualMachine::VirtualMachine(VirtualMachine&& vm) : memory{vm.memory}, pc{vm.p
     tlb_cache = std::move(vm.tlb_cache);
     running = std::move(vm.running);
     paused = std::move(vm.paused);
+    pause_on_break = std::move(vm.pause_on_break);
+    pause_on_restart = std::move(vm.pause_on_restart);
     err = std::move(vm.err);
     break_points = std::move(vm.break_points);
     ticks = std::move(vm.ticks);
-    history_delta = std::move(history_delta);
-    history_tick = std::move(history_tick);
+    history_delta = std::move(vm.history_delta);
+    history_tick = std::move(vm.history_tick);
 }
 
 VirtualMachine::~VirtualMachine() {
@@ -1447,8 +1449,8 @@ bool VirtualMachine::Step(uint32_t steps) {
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
-                result.u64 &= ~(1U<<63);
-                result.u64 |= rhs.u64 & (1U<<63);
+                result.u64 &= ~(1ULL<<63);
+                result.u64 |= rhs.u64 & (1ULL<<63);
                 fregs[instr.rd] = result;
                 break;
             }
@@ -1457,8 +1459,8 @@ bool VirtualMachine::Step(uint32_t steps) {
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
-                result.u64 &= ~(1U<<63);
-                result.u64 |= (~rhs.u64) & (1U<<63);
+                result.u64 &= ~(1ULL<<63);
+                result.u64 |= (~rhs.u64) & (1ULL<<63);
                 fregs[instr.rd] = result;
                 break;
             }
@@ -1467,7 +1469,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
-                result.u64 ^= rhs.u64 & (1U<<63);
+                result.u64 ^= rhs.u64 & (1ULL<<63);
                 fregs[instr.rd] = result;
                 break;
             }
@@ -1804,11 +1806,13 @@ bool VirtualMachine::Step(uint32_t steps) {
 }
 
 void VirtualMachine::Run() {
-    std::cout << this << "\n";
-
     while (running) {
         if (paused) {
+#if defined(_WIN32) || defined(_WIN64)
             SwitchToThread();
+#else
+            sched_yield();
+#endif
         
         }
         else {

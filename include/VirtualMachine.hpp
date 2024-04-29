@@ -262,6 +262,7 @@ private:
     bool running = false;
     bool paused = false;
     bool pause_on_break = false;
+    bool pause_on_restart = false;
     std::string err = "";
 
     std::set<uint32_t> break_points;
@@ -288,20 +289,25 @@ public:
             this->pc -= 4;
 
         Setup();
-        running = true;
+        paused = pause_on_restart;
     }
     inline bool IsRunning() const { return running; }
     inline void Stop() { running = false; }
 
     inline void Pause() { paused = true; }
-    inline bool IsPaused() { return paused; }
+    inline bool IsPaused() const { return paused; }
     inline void Unpause() { paused = false; }
 
-    inline void PauseOnBreak(bool pause_on_break) { this->pause_on_break = pause_on_break; }
-    inline bool CanBreak() { return pause_on_break; }
+    inline void SetPauseOnBreak(bool pause_on_break) { this->pause_on_break = pause_on_break; }
+    inline bool PauseOnBreak() const { return pause_on_break; }
+
+    inline void SetPauseOnRestart(bool pause_on_restart) { this->pause_on_restart = pause_on_restart; }
+    inline bool PauseOnRestart() const { return pause_on_restart; }
 
     bool Step(uint32_t steps = 1000);
     void Run();
+
+    inline void SetPC(uint32_t pc) { this->pc = pc; }
 
     void GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, uint32_t& pc);
     void GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs) const;
