@@ -9,7 +9,7 @@
 
 void GUIAssembly::Draw() {
     if (ImGui::Begin("Assembly")) {
-        uint32_t pc = vm.GetPC();
+        uint32_t pc = vm->GetPC();
 
         bool needs_scroll = pc != last_pc;
         last_pc = pc;
@@ -41,7 +41,7 @@ void GUIAssembly::Draw() {
                 if (addr == pc) {
                     ImGui::TextColored(gui_pc_highlight_color, "-> 0x%08x %s", addr, std::string(instr).c_str());
                     if (needs_scroll) ImGui::SetScrollHereY();
-                } else if (vm.IsBreakPoint(addr)) {
+                } else if (vm->IsBreakPoint(addr)) {
                     ImGui::TextColored(gui_break_highlight_color, "   0x%08x %s", addr, std::string(instr).c_str());
                 } else {
                     ImGui::Text("   0x%08x %s", addr, std::string(instr).c_str());
@@ -52,7 +52,7 @@ void GUIAssembly::Draw() {
                     ImGui::TextColored(gui_pc_highlight_color, "-> Unmapped Memory");
                     if (needs_scroll) ImGui::SetScrollHereY();
                 }
-                else if (vm.IsBreakPoint(addr))
+                else if (vm->IsBreakPoint(addr))
                     ImGui::TextColored(gui_break_highlight_color, "   Unmapped Memory");
                 
                 else

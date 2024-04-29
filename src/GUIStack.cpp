@@ -9,7 +9,7 @@
 
 void GUIStack::Draw() {
     if (ImGui::Begin("Stack")) {
-        uint32_t sp = vm.GetSP();
+        uint32_t sp = vm->GetSP();
 
         int64_t window_begin = sp >> 2;
         int64_t window_end = window_begin + WINDOW;

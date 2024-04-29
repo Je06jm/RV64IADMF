@@ -53,7 +53,7 @@ void GUIMemoryViewer::UpdateBuffer() {
     data_buffer = memory.PeekWords(read_address, (end_address - read_address) / sizeof(uint32_t));
 }
 
-GUIMemoryViewer::GUIMemoryViewer(Memory& memory, VirtualMachine& vm, uint32_t read_address) : memory{memory}, vm{vm}, read_address{read_address} {
+GUIMemoryViewer::GUIMemoryViewer(Memory& memory, std::shared_ptr<VirtualMachine> vm, uint32_t read_address) : memory{memory}, read_address{read_address}, vm{vm} {
     UpdateBuffer();
 }
 
@@ -122,9 +122,9 @@ void GUIMemoryViewer::Draw() {
                             uint32_t value = data_buffer[byte_index >> 2].first;
                             uint8_t byte = value >> (8 * (byte_index & 0b11));
 
-                            if (addr + c == vm.GetPC()) {
+                            if (addr + c == vm->GetPC()) {
                                 ImGui::TextColored(gui_pc_highlight_color, "%02x", byte);
-                            } else if (addr + c == vm.GetSP()) {
+                            } else if (addr + c == vm->GetSP()) {
                                 ImGui::TextColored(gui_sp_highlight_color, "%02x", byte);
                             } else {
                                 ImGui::Text("%02x", byte);
@@ -138,9 +138,9 @@ void GUIMemoryViewer::Draw() {
                             }
                         }
                         else {
-                            if (addr + c == vm.GetPC())
+                            if (addr + c == vm->GetPC())
                                 ImGui::TextColored(gui_pc_highlight_color, "xx");
-                            else if (addr + c == vm.GetSP())
+                            else if (addr + c == vm->GetSP())
                                 ImGui::TextColored(gui_sp_highlight_color, "xx");
                             else
                                 ImGui::Text("xx");

@@ -9,6 +9,12 @@
 #include <cmath>
 #include <fenv.h>
 
+#include <iostream>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 const int VirtualMachine::default_rounding_mode = fegetround();
 
 bool VirtualMachine::TLBEntry::IsFlagsSet(uint32_t flags) const {
@@ -211,7 +217,7 @@ bool VirtualMachine::CheckFloatErrors() {
     return false;
 }
 
-VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t instructions_per_second, uint32_t hart_id) : memory{memory}, pc{starting_pc}, instructions_per_second{instructions_per_second} {
+void VirtualMachine::Setup() {
     for (auto& r : regs) {
         r = 0;
     }
@@ -248,6 +254,10 @@ VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t inst
 
     // Machine
 
+    csrs[CSR_MSTATUS] = 0;
+}
+
+VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t hart_id) : memory{memory}, pc{starting_pc} {
     csrs[CSR_MVENDORID] = 0;
 
     csrs[CSR_MARCHID] = ('E' << 24) | ('N' << 16) | ('I' << 8) | ('H');
@@ -256,8 +266,22 @@ VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, size_t inst
     csrs[CSR_MHARTID] = hart_id;
 
     csrs[CSR_MISA] = ISA_32_BITS | ISA_A | ISA_D | ISA_F | ISA_I | ISA_M;
+    
+    Setup();
+}
 
-    csrs[CSR_MSTATUS] = 0;
+VirtualMachine::VirtualMachine(VirtualMachine&& vm) : memory{vm.memory}, pc{vm.pc} {
+    regs = std::move(vm.regs);
+    fregs = std::move(vm.fregs);
+    csrs = std::move(vm.csrs);
+    tlb_cache = std::move(vm.tlb_cache);
+    running = std::move(vm.running);
+    paused = std::move(vm.paused);
+    err = std::move(vm.err);
+    break_points = std::move(vm.break_points);
+    ticks = std::move(vm.ticks);
+    history_delta = std::move(history_delta);
+    history_tick = std::move(history_tick);
 }
 
 VirtualMachine::~VirtualMachine() {
@@ -614,10 +638,10 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::ECALL:
                 if (!ecall_handlers.contains(regs[REG_A0]))
-                    EmptyECallHandler(memory, regs, fregs);
+                    EmptyECallHandler(csrs[CSR_MHARTID], memory, regs, fregs);
                 
                 else
-                    ecall_handlers[regs[REG_A0]](memory, regs, fregs);
+                    ecall_handlers[regs[REG_A0]](csrs[CSR_MHARTID], memory, regs, fregs);
 
                 break;
             
@@ -1768,7 +1792,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             default:
-                pc += 4;
+                    pc += 4;
         }
         
         if (instr.rd == 0) regs[instr.rd] = 0;
@@ -1777,6 +1801,21 @@ bool VirtualMachine::Step(uint32_t steps) {
     }
 
     return false;
+}
+
+void VirtualMachine::Run() {
+    std::cout << this << "\n";
+
+    while (running) {
+        if (paused) {
+            SwitchToThread();
+        
+        }
+        else {
+            if (Step() && pause_on_break)
+                paused = true;
+        }
+    }
 }
 
 void VirtualMachine::GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, uint32_t& pc) {
@@ -1829,8 +1868,8 @@ void VirtualMachine::UpdateTime() {
     }
 }
 
-void VirtualMachine::EmptyECallHandler(Memory&, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&) {
-    throw std::runtime_error(std::format("Unknown ECall handler: {}", regs[REG_A0]));
+void VirtualMachine::EmptyECallHandler(uint32_t hart, Memory&, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&) {
+    throw std::runtime_error(std::format("Hart {} called unknown ECall handler: {}", hart, regs[REG_A0]));
 }
 
 std::unordered_map<uint32_t, VirtualMachine::ECallHandler> VirtualMachine::ecall_handlers;

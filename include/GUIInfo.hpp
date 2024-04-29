@@ -4,13 +4,23 @@
 #include "Memory.hpp"
 #include "VirtualMachine.hpp"
 
+#include <vector>
+
 class GUIInfo {
     Memory& memory;
-    VirtualMachine& vm;
+
+    uint32_t selected_hart = 0;
+    const std::vector<uint32_t> harts;
 
 public:
-    GUIInfo(Memory& memory, VirtualMachine& vm) : memory{memory}, vm{vm} {}
+    std::shared_ptr<VirtualMachine> vm;
+
+    GUIInfo(Memory& memory, std::shared_ptr<VirtualMachine> vm, const std::vector<uint32_t>& harts) : memory{memory}, harts{harts}, vm{vm} {}
     ~GUIInfo() = default;
+
+    inline uint32_t GetSelectedHart() const {
+        return harts[selected_hart];
+    }
 
     void Draw();
 };

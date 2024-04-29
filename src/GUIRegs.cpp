@@ -10,7 +10,7 @@ void GUIRegs::Draw() {
         std::array<Float, VirtualMachine::REGISTER_COUNT> fregs;
         uint32_t pc;
 
-        vm.GetSnapshot(regs, fregs, pc);
+        vm->GetSnapshot(regs, fregs, pc);
 
         ImGui::TextColored(gui_pc_highlight_color, "          pc  : 0x%08x", pc);
         ImGui::TextColored(gui_sp_highlight_color, "          sp  : 0x%08x", regs[2]);

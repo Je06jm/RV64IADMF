@@ -4,10 +4,10 @@
 #include "VirtualMachine.hpp"
 
 class GUIRegs {
-    VirtualMachine& vm;
-
 public:
-    GUIRegs(VirtualMachine& vm) : vm{vm} {}
+    std::shared_ptr<VirtualMachine> vm;
+    
+    GUIRegs(std::shared_ptr<VirtualMachine> vm) : vm{vm} {}
     ~GUIRegs() = default;
 
     void Draw();

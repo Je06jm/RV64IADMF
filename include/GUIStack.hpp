@@ -5,13 +5,13 @@
 #include "Memory.hpp"
 
 class GUIStack {
-    VirtualMachine& vm;
     Memory& memory;
 
     static constexpr size_t WINDOW = 128;
 
 public:
-    GUIStack(VirtualMachine& vm, Memory& memory) : vm{vm}, memory{memory} {}
+    std::shared_ptr<VirtualMachine> vm;
+    GUIStack(std::shared_ptr<VirtualMachine> vm, Memory& memory) : memory{memory}, vm{vm} {}
     ~GUIStack() = default;
 
     void Draw();

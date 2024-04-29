@@ -292,7 +292,7 @@ void GUICSR::Draw() {
 
     if (ImGui::Begin("CSRs")) {
         std::unordered_map<uint32_t, uint32_t> csrs;
-        vm.GetCSRSnapshot(csrs);
+        vm->GetCSRSnapshot(csrs);
 
         for (const auto& [csr, name, binary] : csrs_names) {
             if (binary)

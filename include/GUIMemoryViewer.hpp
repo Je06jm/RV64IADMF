@@ -11,7 +11,6 @@
 
 class GUIMemoryViewer {
     Memory& memory;
-    VirtualMachine& vm;
 
     struct Style {
         float glyph_width;
@@ -37,7 +36,9 @@ class GUIMemoryViewer {
     std::string text_input_buffer = "0";
 
 public:
-    GUIMemoryViewer(Memory& memory, VirtualMachine& vm, uint32_t read_address = 0);
+    std::shared_ptr<VirtualMachine> vm;
+    
+    GUIMemoryViewer(Memory& memory, std::shared_ptr<VirtualMachine> vm, uint32_t read_address = 0);
     ~GUIMemoryViewer() = default;
 
     void Draw();

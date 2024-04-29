@@ -5,8 +5,9 @@
 #include "Memory.hpp"
 #include "RV32I.hpp"
 
+#include <memory>
+
 class GUIAssembly {
-    VirtualMachine& vm;
     Memory& memory;
 
     uint32_t last_pc = 0;
@@ -15,7 +16,9 @@ class GUIAssembly {
     static constexpr size_t WINDOW_SLIDE = 12;
 
 public:
-    GUIAssembly(VirtualMachine& vm, Memory& memory) : vm{vm}, memory{memory} {}
+    std::shared_ptr<VirtualMachine> vm;
+
+    GUIAssembly(std::shared_ptr<VirtualMachine> vm, Memory& memory) : memory{memory}, vm{vm} {}
     ~GUIAssembly() = default;
 
     void Draw();

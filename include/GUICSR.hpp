@@ -3,11 +3,13 @@
 
 #include "VirtualMachine.hpp"
 
-class GUICSR {
-    VirtualMachine& vm;
+#include <memory>
 
+class GUICSR {
 public:
-    GUICSR(VirtualMachine& vm) : vm{vm} {}
+    std::shared_ptr<VirtualMachine> vm;
+    
+    GUICSR(std::shared_ptr<VirtualMachine> vm) : vm{vm} {}
     ~GUICSR() = default;
 
     void Draw();

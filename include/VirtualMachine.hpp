@@ -261,6 +261,7 @@ private:
 
     bool running = false;
     bool paused = false;
+    bool pause_on_break = false;
     std::string err = "";
 
     std::set<uint32_t> break_points;
@@ -271,6 +272,8 @@ private:
 
     static constexpr size_t MAX_HISTORY = 15;
 
+    void Setup();
+
 public:
     VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t hart_id);
     VirtualMachine(const VirtualMachine&) = delete;
@@ -278,12 +281,24 @@ public:
     ~VirtualMachine();
     
     inline void Start() { running = true; }
+    inline void Restart(uint32_t pc, uint32_t source_hart) {
+        this->pc = pc;
+
+        if (source_hart == csrs[CSR_MHARTID])
+            this->pc -= 4;
+
+        Setup();
+        running = true;
+    }
     inline bool IsRunning() const { return running; }
     inline void Stop() { running = false; }
 
     inline void Pause() { paused = true; }
     inline bool IsPaused() { return paused; }
     inline void Unpause() { paused = false; }
+
+    inline void PauseOnBreak(bool pause_on_break) { this->pause_on_break = pause_on_break; }
+    inline bool CanBreak() { return pause_on_break; }
 
     bool Step(uint32_t steps = 1000);
     void Run();
@@ -316,10 +331,10 @@ public:
 
     void UpdateTime();
 
-    using ECallHandler = std::function<void(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>& fregs)>;
+    using ECallHandler = std::function<void(uint32_t hart, Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>& fregs)>;
 
 private:
-    static void EmptyECallHandler(Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&);
+    static void EmptyECallHandler(uint32_t hart, Memory& memory, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&);
 
     static std::unordered_map<uint32_t, ECallHandler> ecall_handlers;
 
