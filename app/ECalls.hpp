@@ -9,6 +9,9 @@ constexpr uint32_t ECALL_COUT = 0;
 // uint32_t ecall_cin(const char* buffer, uint32_t buffer_size);
 constexpr uint32_t ECALL_CIN = 1;
 
+// void ecall_get_screen_size(uint32_t* x, uint32_t* y);
+constexpr uint32_t ECALL_GET_SCREEN_SIZE = -3U;
+
 // uint32_t ecall_get_memory_size();
 constexpr uint32_t ECALL_GET_MEMORY_SIZE = -2U;
 
