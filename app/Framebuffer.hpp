@@ -1,5 +1,5 @@
-#ifndef FRAMEBUFFER_HPP
-#define FRAMEBUFFER_HPP
+#ifndef APP_FRAMEBUFFER_HPP
+#define APP_FRAMEBUFFER_HPP
 
 #include <Memory.hpp>
 #include <OpenGL.hpp>

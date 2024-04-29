@@ -1,5 +1,5 @@
-#ifndef SOCKET_HPP
-#define SOCKET_HPP
+#ifndef APP_SOCKET_HPP
+#define APP_SOCKET_HPP
 
 #include <cstdint>
 #include <vector>
