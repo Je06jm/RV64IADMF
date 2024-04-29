@@ -59,10 +59,17 @@ private:
 
     inline void EnsurePageIsLoaded(size_t page) const {
         if (pages[page] == nullptr) {
+            lock.lock();
+            if (pages[page]) {
+                lock.unlock();
+                return;
+            }
+
             pages[page] = std::unique_ptr<Page>(new Page);
             for (auto& word : *pages[page])
                 word = 0;
             loaded_pages++;
+            lock.unlock();
         }
     }
 
