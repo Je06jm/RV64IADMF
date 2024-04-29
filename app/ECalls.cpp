@@ -60,6 +60,10 @@ void ECallGetCPUs(uint32_t, Memory& memory, Regs& regs, FRegs&) {
     regs[VM::REG_A0] = static_cast<uint32_t>(vms.size());
 }
 
+void ECallGetScreenAddress(uint32_t, Memory&, Regs& regs, FRegs&) {
+    regs[VM::REG_A0] = framebuffer_address;
+}
+
 void ECallGetScreenSize(uint32_t, Memory& memory, Regs& regs, FRegs&) {
     memory.WriteWord(regs[VM::REG_A1], framebuffer_width);
     memory.WriteWord(regs[VM::REG_A2], framebuffer_height);
@@ -85,6 +89,7 @@ void RegisterECalls() {
     VM::RegisterECall(ECALL_CIN, ECallCIn);
     VM::RegisterECall(ECALL_START_CPU, ECallStartCPU);
     VM::RegisterECall(ECALL_GET_CPUS, ECallGetCPUs);
+    VM::RegisterECall(ECALL_GET_SCREEN_ADDRESS, ECallGetScreenAddress);
     VM::RegisterECall(ECALL_GET_SCREEN_SIZE, ECallGetScreenSize);
     VM::RegisterECall(ECALL_GET_MEMORY_SIZE, ECallGetMemorySize);
     VM::RegisterECall(ECALL_EXIT, ECallExit);

@@ -33,6 +33,7 @@ int main(int argc, const char** argv) {
     
     framebuffer_width = 800;
     framebuffer_height = 600;
+    framebuffer_address = 0xffe00000;
 
     uint32_t cores = 2;
 
@@ -69,7 +70,7 @@ int main(int argc, const char** argv) {
         }
         memory.ReadFileInto(bios_path, 0);
 
-        auto framebuffer = MemoryFramebuffer::Create(0x10000000, framebuffer_width, framebuffer_height);
+        auto framebuffer = MemoryFramebuffer::Create(framebuffer_address, framebuffer_width, framebuffer_height);
         memory.AddMemoryRegion(framebuffer);
 
         std::vector<uint32_t> harts;

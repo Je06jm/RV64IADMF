@@ -8,6 +8,7 @@
 
 inline size_t framebuffer_width;
 inline size_t framebuffer_height;
+inline uint32_t framebuffer_address;
 
 class MemoryFramebuffer : public MemoryRegion {
 private:
