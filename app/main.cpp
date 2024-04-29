@@ -143,7 +143,7 @@ int main(int argc, const char** argv) {
 
             vm->UpdateTime();
 
-            if (ImGui::IsKeyPressed(ImGuiKey_Space, false) && vm->IsPaused())
+            if (ImGui::IsKeyPressed(ImGuiKey_Space, true) && vm->IsPaused())
                 vm->Step(1);
             
             if (ImGui::IsKeyPressed(ImGuiKey_Enter, false)) {
