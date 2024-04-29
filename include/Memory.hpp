@@ -152,7 +152,11 @@ public:
     }
 
     inline size_t GetTotalMemory() const {
-        return max_address;
+        size_t total_memory = 0;
+        for (auto& region : regions)
+            total_memory += region->size;
+        
+        return total_memory;
     }
 
     inline size_t GetUsedMemory() const {
