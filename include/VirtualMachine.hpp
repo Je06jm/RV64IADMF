@@ -213,6 +213,13 @@ public:
         csrs[CSR_SSTATUS] = sstatus.raw;
     }
 
+    enum class PrivilegeLevel {
+        Machine,
+        Supervisor,
+        User
+    };
+    PrivilegeLevel privilege_level;
+
     static constexpr size_t REG_ZERO = 0;
     static constexpr size_t REG_RA = 1;
     static constexpr size_t REG_SP = 2;

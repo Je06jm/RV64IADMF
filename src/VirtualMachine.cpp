@@ -283,6 +283,8 @@ void VirtualMachine::Setup() {
     // Machine
 
     csrs[CSR_MSTATUS] = 0;
+
+    privilege_level = PrivilegeLevel::Machine;
 }
 
 VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t hart_id) : memory{memory}, pc{starting_pc} {
