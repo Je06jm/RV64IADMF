@@ -63,19 +63,21 @@ int main(int argc, const char** argv) {
 
     Window window("RV32IMF", window_width, window_height);
     {
+        constexpr uint32_t BIOS_RAM_ADDRESS = 0x1000;
+
         Memory memory;
         {
-            auto ram = MemoryRAM::Create(0, 2 * 1024 * 1024);
+            auto ram = MemoryRAM::Create(BIOS_RAM_ADDRESS, 2 * 1024 * 1024);
             memory.AddMemoryRegion(std::move(ram));
         }
-        memory.ReadFileInto(bios_path, 0);
+        memory.ReadFileInto(bios_path, BIOS_RAM_ADDRESS);
 
         auto framebuffer = MemoryFramebuffer::Create(framebuffer_address, framebuffer_width, framebuffer_height);
         memory.AddMemoryRegion(framebuffer);
 
         std::vector<uint32_t> harts;
         for (uint32_t i = 0; i < cores; i++) {
-            vms.push_back(std::make_shared<VirtualMachine>(memory, 0, i));
+            vms.push_back(std::make_shared<VirtualMachine>(memory, BIOS_RAM_ADDRESS, i));
             harts.push_back(i);
         }
 

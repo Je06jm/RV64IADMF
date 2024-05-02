@@ -5,7 +5,7 @@
 #include <iostream>
 #include <cstdlib>
 
-MemoryFramebuffer::MemoryFramebuffer(uint32_t base, uint32_t size, size_t width, size_t height) : MemoryRegion(base, size, true, true), width{width}, height{height} {
+MemoryFramebuffer::MemoryFramebuffer(uint32_t base, uint32_t size, size_t width, size_t height) : MemoryRegion(TYPE_FRAMEBUFFER, base, size, true, true), width{width}, height{height} {
     word_buffer.resize(size, 0);
     for (auto& word : word_buffer)
         word = 0;
