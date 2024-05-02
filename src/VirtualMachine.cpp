@@ -401,6 +401,8 @@ bool VirtualMachine::Step(uint32_t steps) {
     constexpr uint64_t RV_F64_QNAN = 0xfff0000000000000;
     
     for (uint32_t i = 0; i < steps && running; i++) {
+        csrs[CSR_MCYCLE]++;
+        
         if (pc & 0b11)
             throw std::runtime_error(std::format("Invalid PC address {:08x}", pc));
         
