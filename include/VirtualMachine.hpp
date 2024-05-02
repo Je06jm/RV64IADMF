@@ -131,6 +131,57 @@ public:
     static constexpr uint16_t CSR_PERFORMANCE_EVENT_MAX = 32;
     static constexpr uint16_t CSR_MHPMEVENT3 = 0x323;
 
+    struct MStatus {
+        union {
+            struct {
+                uint32_t _unused0 : 1;
+                uint32_t SIE : 1;
+                uint32_t _unused1 : 1;
+                uint32_t MIE : 1;
+                uint32_t _unused2 : 1;
+                uint32_t SPIE : 1;
+                uint32_t UBE : 1;
+                uint32_t MPIE : 1;
+                uint32_t SPP : 1;
+                uint32_t VS : 2;
+                uint32_t MMP : 2;
+                uint32_t FS : 2;
+                uint32_t XS : 2;
+                uint32_t MPRIV : 1;
+                uint32_t SUM : 1;
+                uint32_t MXR : 1;
+                uint32_t TVM : 1;
+                uint32_t TW : 1;
+                uint32_t TSR : 1;
+                uint32_t _unused3 : 8;
+                uint32_t SD : 1;
+            };
+            uint32_t raw;
+        };
+
+        union {
+            struct {
+                uint32_t _unused0 : 4;
+                uint32_t SBE : 1;
+                uint32_t MBE : 1;
+                uint32_t _unused1 : 26;
+            };
+            uint32_t rawh;
+        };
+    };
+
+    inline MStatus ReadMStatus() const {
+        MStatus mstatus;
+        mstatus.raw = csrs.at(CSR_MSTATUS);
+        mstatus.rawh = csrs.at(CSR_MSTATUSH);
+        return mstatus;
+    }
+
+    inline void WriteMStatus(MStatus mstatus) {
+        csrs[CSR_MSTATUS] = mstatus.raw;
+        csrs[CSR_MSTATUSH] = mstatus.rawh;
+    }
+
     static constexpr size_t REG_ZERO = 0;
     static constexpr size_t REG_RA = 1;
     static constexpr size_t REG_SP = 2;
