@@ -28,6 +28,15 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
     if (!csrs.contains(csr))
         throw std::runtime_error("Read Invalid CSR");
     
+    if (csr >= CSR_MHPMEVENT3 && csr < (CSR_MHPMEVENT3 + CSR_PERFORMANCE_EVENT_MAX - 3))
+        return 0;
+    
+    if (csr >= CSR_MHPMCOUNTER3 && csr < (CSR_MHPMCOUNTER3 + CSR_PERF_COUNTER_MAX - 3))
+        return 0;
+    
+    if (csr >= CSR_MHPMCOUNTER3H && csr < (CSR_MHPMCOUNTER3H + CSR_PERF_COUNTER_MAX - 3))
+        return 0;
+
     return csrs[csr];
 }
 
@@ -44,6 +53,8 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
         case CSR_MIMPID:
         case CSR_MHARTID:
         case CSR_MISA:
+        case CSR_MINSTRET:
+        case CSR_MINSTRETH:
             return; // Non writable
         
         default:
