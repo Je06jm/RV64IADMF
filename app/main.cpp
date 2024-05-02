@@ -135,6 +135,9 @@ int main(int argc, const char** argv) {
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
 
+            for (auto& vm : vms)
+                vm->UpdateTime();
+
             auto vm = vms[info.GetSelectedHart()];
             mem_viewer.vm = vm;
             assembly.vm = vm;
@@ -142,8 +145,6 @@ int main(int argc, const char** argv) {
             state.vm = vm;
             stack.vm = vm;
             csr.vm = vm;
-
-            vm->UpdateTime();
 
             if (ImGui::IsKeyPressed(ImGuiKey_Space, true) && vm->IsPaused())
                 vm->Step(1);
