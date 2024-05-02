@@ -228,6 +228,23 @@ bool VirtualMachine::CheckFloatErrors() {
     return false;
 }
 
+VirtualMachine::MemoryAccess VirtualMachine::CheckMemoryAccess(uint32_t address) const {
+    MemoryAccess maccess;
+    maccess.m_read = 1;
+    maccess.m_write = 1;
+    maccess.m_execute = 1;
+    maccess.s_read = 1;
+    maccess.s_write = 1;
+    maccess.s_execute = 1;
+    maccess.u_read = 1;
+    maccess.u_write = 1;
+    maccess.u_execute = 1;
+    maccess.address_present = 1;
+    maccess.translated_address = address;
+
+    return maccess;
+}
+
 void VirtualMachine::Setup() {
     for (auto& r : regs) {
         r = 0;
@@ -433,7 +450,11 @@ bool VirtualMachine::Step(uint32_t steps) {
         if (pc & 0b11)
             throw std::runtime_error(std::format("Invalid PC address {:08x}", pc));
         
-        auto instr = RVInstruction::FromUInt32(memory.ReadWord(pc));
+        auto maccess_instr = CheckMemoryAccess(pc);
+        if (!maccess_instr.address_present)
+            throw std::runtime_error(std::format("PC address is not present (Missing page?) {:08x}", pc));
+
+        auto instr = RVInstruction::FromUInt32(memory.ReadWord(maccess_instr.translated_address));
 
         switch (instr.type) {
             case Type::LUI:

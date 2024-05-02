@@ -308,6 +308,21 @@ private:
 
     Memory& memory;
 
+    struct MemoryAccess {
+        uint32_t m_read : 1;
+        uint32_t m_write : 1;
+        uint32_t m_execute : 1;
+        uint32_t s_read : 1;
+        uint32_t s_write : 1;
+        uint32_t s_execute : 1;
+        uint32_t u_read : 1;
+        uint32_t u_write : 1;
+        uint32_t u_execute : 1;
+        uint32_t address_present : 1;
+        uint32_t translated_address;
+    };
+    MemoryAccess CheckMemoryAccess(uint32_t address) const;
+
     uint32_t pc;
 
     bool running = false;
