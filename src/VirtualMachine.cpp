@@ -60,9 +60,11 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
             return static_cast<uint32_t>(csr_mapped_memory->time >> 32);
 
         case CSR_MSTATUS:
+            mstatus.SD = mstatus.FS == FS_DIRTY;
             return mstatus.raw;
-        
+
         case CSR_SSTATUS:
+            sstatus.SD = sstatus.FS == FS_DIRTY;
             return sstatus.raw;
 
         default:
@@ -890,6 +892,9 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             case Type::FLW:
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 fregs[instr.rd] = ToFloat(memory.ReadWord(regs[instr.rs1] + instr.immediate));
                 break;
             
@@ -899,6 +904,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FMADD_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool lhs_is_inf;
                 bool rhs_is_zero;
@@ -920,6 +927,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FMSUB_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool lhs_is_inf;
                 bool rhs_is_zero;
@@ -941,6 +950,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FNMSUB_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool lhs_is_inf;
                 bool rhs_is_zero;
@@ -962,6 +973,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FNMADD_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool lhs_is_inf;
                 bool rhs_is_zero;
@@ -983,6 +996,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FADD_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 float result = fregs[instr.rs1].f + fregs[instr.rs2].f;
 
@@ -997,6 +1012,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FSUB_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 float result = fregs[instr.rs1].f - fregs[instr.rs2].f;
 
@@ -1011,6 +1028,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FMUL_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 float result = fregs[instr.rs1].f * fregs[instr.rs2].f;
 
@@ -1025,6 +1044,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FDIV_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 float result = fregs[instr.rs1].f / fregs[instr.rs2].f;
 
@@ -1039,6 +1060,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FSQRT_S: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool is_inf, is_nan, is_qnan, is_neg;
                 ClassF32(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, &is_neg);
@@ -1053,6 +1076,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FSGNJ_S: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
@@ -1063,6 +1089,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FSGNJN_S: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
@@ -1073,6 +1102,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FSGNJX_S: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
@@ -1090,6 +1122,9 @@ bool VirtualMachine::Step(uint32_t steps) {
                 ClassF32(fregs[instr.rs2], nullptr, &rhs_snan, &rhs_qnan, nullptr, nullptr, &rhs_neg);
                 bool lhs_nan = lhs_snan || lhs_qnan;
                 bool rhs_nan = rhs_snan || rhs_qnan;
+
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 if (lhs_nan && rhs_nan) {
                     SetFloatFlags(true, false, false, false, false);
@@ -1128,6 +1163,9 @@ bool VirtualMachine::Step(uint32_t steps) {
                 ClassF32(fregs[instr.rs2], nullptr, &rhs_snan, &rhs_qnan, nullptr, nullptr, &rhs_neg);
                 bool lhs_nan = lhs_snan || lhs_qnan;
                 bool rhs_nan = rhs_snan || rhs_qnan;
+
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 if (lhs_nan && rhs_nan) {
                     SetFloatFlags(true, false, false, false, false);
@@ -1307,6 +1345,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FCVT_S_W: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 auto val = AsSigned(regs[instr.rs1]);
 
                 fregs[instr.rd].f = val;
@@ -1317,6 +1358,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FCVT_S_WU:
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 fregs[instr.rd].f = regs[instr.rs1];
                 if (fregs[instr.rd].f != regs[instr.rs1])
                     SetFloatFlags(true, false, false, false, false);
@@ -1324,11 +1368,17 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             case Type::FMV_W_X:
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 fregs[instr.rd].u64 = 0;
                 fregs[instr.rd].u32 = regs[instr.rs1];
                 break;
             
             case Type::FLD: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 auto addr = regs[instr.rs1] + instr.immediate;
                 uint64_t val = memory.ReadWord(addr);
                 val |= static_cast<uint64_t>(memory.ReadWord(addr + 4)) << 32;
@@ -1346,6 +1396,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FMADD_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool lhs_is_inf;
                 bool rhs_is_zero;
@@ -1367,6 +1419,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FMSUB_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool lhs_is_inf;
                 bool rhs_is_zero;
@@ -1388,6 +1442,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FNMSUB_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool lhs_is_inf;
                 bool rhs_is_zero;
@@ -1409,6 +1465,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FNMADD_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool lhs_is_inf;
                 bool rhs_is_zero;
@@ -1430,6 +1488,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FADD_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 double result = fregs[instr.rs1].d + fregs[instr.rs2].d;
 
@@ -1444,6 +1504,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FSUB_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 double result = fregs[instr.rs1].d - fregs[instr.rs2].d;
 
@@ -1458,6 +1520,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FMUL_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 double result = fregs[instr.rs1].d * fregs[instr.rs2].d;
 
@@ -1472,6 +1536,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FDIV_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 double result = fregs[instr.rs1].d / fregs[instr.rs2].d;
 
@@ -1486,6 +1552,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FSQRT_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 bool is_inf, is_nan, is_qnan, is_neg;
                 ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, &is_neg);
@@ -1500,6 +1568,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FSGNJ_D: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
@@ -1510,6 +1581,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FSGNJN_D: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
@@ -1520,6 +1594,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FSGNJX_D: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 Float result = fregs[instr.rs1];
                 Float rhs = fregs[instr.rs2];
 
@@ -1537,6 +1614,9 @@ bool VirtualMachine::Step(uint32_t steps) {
                 ClassF64(fregs[instr.rs2], nullptr, &rhs_snan, &rhs_qnan, nullptr, nullptr, &rhs_neg);
                 bool lhs_nan = lhs_snan || lhs_qnan;
                 bool rhs_nan = rhs_snan || rhs_qnan;
+
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
 
                 if (lhs_nan && rhs_nan) {
                     SetFloatFlags(true, false, false, false, false);
@@ -1576,6 +1656,9 @@ bool VirtualMachine::Step(uint32_t steps) {
                 bool lhs_nan = lhs_snan || lhs_qnan;
                 bool rhs_nan = rhs_snan || rhs_qnan;
 
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 if (lhs_nan && rhs_nan) {
                     SetFloatFlags(true, false, false, false, false);
                     fregs[instr.rd].u64 = RV_F64_NAN;
@@ -1606,6 +1689,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::FCVT_S_D: {
                 if (!ChangeRoundingMode(instr.rm)) InvalidInstruction();
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
                 
                 bool lhs_snan, lhs_qnan;
                 ClassF64(fregs[instr.rs1], nullptr, &lhs_snan, &lhs_qnan, nullptr, nullptr, nullptr);
@@ -1622,6 +1707,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FCVT_D_S: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 bool lhs_snan, lhs_qnan;
                 ClassF32(fregs[instr.rs1], nullptr, &lhs_snan, &lhs_qnan, nullptr, nullptr, nullptr);
 
@@ -1778,6 +1866,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FCVT_D_W: {
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
                 auto val = AsSigned(regs[instr.rs1]);
 
                 fregs[instr.rd].d = val;
@@ -1788,6 +1879,9 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::FCVT_D_WU:
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+                
                 fregs[instr.rd].d = regs[instr.rs1];
                 if (fregs[instr.rd].d != regs[instr.rs1])
                     SetFloatFlags(true, false, false, false, false);

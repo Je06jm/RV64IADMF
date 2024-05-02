@@ -160,6 +160,11 @@ public:
         uint32_t raw;
     };
 
+    static constexpr uint8_t FS_OFF = 0;
+    static constexpr uint8_t FS_INITIAL = 1;
+    static constexpr uint8_t FS_CLEAN = 2;
+    static constexpr uint8_t FS_DIRTY = 3;
+
     inline MStatus ReadMStatus() const {
         MStatus mstatus;
         mstatus.raw = csrs.at(CSR_MSTATUS);
