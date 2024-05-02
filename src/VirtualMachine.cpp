@@ -85,6 +85,7 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
         case CSR_CYCLEH:
         case CSR_TIME:
         case CSR_TIMEH:
+        case CSR_MSTATUSH:
             return; // Non writable
         
         default:
