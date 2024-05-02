@@ -164,7 +164,18 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
     if (!csrs.contains(csr))
         throw std::runtime_error("Write Invalid CSR");
     
-    csrs[csr] = value;
+    switch (csr) {
+        case CSR_MVENDORID:
+        case CSR_MARCHID:
+        case CSR_MIMPID:
+        case CSR_MHARTID:
+        case CSR_MISA:
+            return; // Non writable
+        
+        default:
+            csrs[csr] = value;
+            break;
+    }
 }
 
 bool VirtualMachine::ChangeRoundingMode(uint8_t rm) {
