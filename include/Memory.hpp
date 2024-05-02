@@ -12,10 +12,18 @@
 
 class MemoryRegion {
 public:
+    const uint32_t type;
     const uint32_t base, size;
     const bool readable, writable;
 
-    MemoryRegion(uint32_t base, uint32_t size, bool readable, bool writable) : base{base}, size{size}, readable{readable}, writable{writable} {}
+    static constexpr uint32_t TYPE_UNKNOWN = -1U;
+    static constexpr uint32_t TYPE_UNUSED = 0;
+    static constexpr uint32_t TYPE_PMA_ROM = 1;
+    static constexpr uint32_t TYPE_BIOS_ROM = 4;
+    static constexpr uint32_t TYPE_GENERAL_RAM = 5;
+    static constexpr uint32_t TYPE_FRAMEBUFFER = 8;
+
+    MemoryRegion(uint32_t type, uint32_t base, uint32_t size, bool readable, bool writable) : type{type}, base{base}, size{size}, readable{readable}, writable{writable} {}
     virtual ~MemoryRegion() = default;
 
     virtual uint32_t ReadWord(uint32_t address) const { return 0; }
@@ -36,7 +44,7 @@ class MemoryROM : public MemoryRegion {
 private:
     const std::vector<uint32_t> words;
 
-    MemoryROM(const std::vector<uint32_t>& words, uint32_t base) : MemoryRegion(base, words.size() * sizeof(uint32_t), true, false), words{words} {}
+    MemoryROM(const std::vector<uint32_t>& words, uint32_t base) : MemoryRegion(TYPE_BIOS_ROM, base, words.size() * sizeof(uint32_t), true, false), words{words} {}
 public:
     uint32_t ReadWord(uint32_t address) const override { return words[address >> 2]; }
     
@@ -107,8 +115,50 @@ private:
     uint32_t max_address = 0;
     uint32_t memory_size = 0;
 
+    class MemoryPMARom : public MemoryRegion {
+    private:
+        const std::vector<std::shared_ptr<MemoryRegion>>& regions;
+
+    public:
+        MemoryPMARom(std::vector<std::shared_ptr<MemoryRegion>>& regions) : MemoryRegion{TYPE_PMA_ROM, 0, 0x1000, true, false}, regions{regions} {}
+
+        uint32_t ReadWord(uint32_t address) const override {
+            address >>= 2;
+            auto index = address >> 2;
+            if (index >= regions.size()) return 0;
+
+            auto region = regions[index];
+
+            switch (address & 3) {
+                case 0:
+                    return region->type;
+                
+                case 1:
+                    return region->base;
+                
+                case 2:
+                    return region->size;
+                
+                case 3: {
+                    uint32_t flags = 0;
+
+                    if (region->readable) flags |= (1<<0);
+                    if (region->writable) flags |= (1<<1);
+
+                    return flags;
+                }
+            }
+        }
+
+        void Lock() const override {}
+        void Unlock() const override {}
+        size_t SizeInMemory() const { return sizeof(std::vector<std::shared_ptr<MemoryRegion>>&); }
+    };
 public:
-    Memory() = default;
+    Memory() {
+        auto pma = std::make_unique<MemoryPMARom>(regions);
+        AddMemoryRegion(std::move(pma));
+    };
 
     Memory(const Memory&) = delete;
     Memory(Memory&&) = delete;

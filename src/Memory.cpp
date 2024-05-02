@@ -34,7 +34,7 @@ std::unique_ptr<MemoryROM> MemoryROM::Create(const std::vector<uint32_t>& words,
     return std::unique_ptr<MemoryROM>(new MemoryROM(words, base & ~3));
 }
 
-MemoryRAM::MemoryRAM(uint32_t base, uint32_t size) : MemoryRegion(base, size, true, true) {
+MemoryRAM::MemoryRAM(uint32_t base, uint32_t size) : MemoryRegion(TYPE_GENERAL_RAM, base, size, true, true) {
     size_t pages_count = size / WORDS_PER_PAGE;
 
     for (size_t i = 0; i < pages_count; i++)
