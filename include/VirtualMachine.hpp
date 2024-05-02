@@ -163,13 +163,11 @@ public:
     inline MStatus ReadMStatus() const {
         MStatus mstatus;
         mstatus.raw = csrs.at(CSR_MSTATUS);
-        mstatus.rawh = csrs.at(CSR_MSTATUSH);
         return mstatus;
     }
 
     inline void WriteMStatus(MStatus mstatus) {
         csrs[CSR_MSTATUS] = mstatus.raw;
-        csrs[CSR_MSTATUSH] = mstatus.rawh;
     }
 
     union SStatus {
