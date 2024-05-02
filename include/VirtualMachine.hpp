@@ -170,6 +170,8 @@ public:
         csrs[CSR_MSTATUS] = mstatus.raw;
     }
 
+    static constexpr uint32_t SSTATUS_WRITABLE_BITS = 0b10000000000011011110011100100010;
+
     union SStatus {
         struct {
             uint32_t _unused0 : 1;
@@ -301,6 +303,9 @@ public:
     };
     
 private:
+    MStatus mstatus;
+    SStatus sstatus;
+
     std::vector<TLBEntry> tlb_cache;
 
     Memory& memory;

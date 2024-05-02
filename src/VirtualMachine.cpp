@@ -59,6 +59,12 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
         case CSR_TIMEH:
             return static_cast<uint32_t>(csr_mapped_memory->time >> 32);
 
+        case CSR_MSTATUS:
+            return mstatus.raw;
+        
+        case CSR_SSTATUS:
+            return sstatus.raw;
+
         default:
             return csrs[csr];
     }
@@ -89,11 +95,16 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
             return; // Non writable
         
         case CSR_MSTATUS: {
-            uint32_t mstatus = csrs[CSR_MSTATUS];
-            mstatus &= ~MSTATUS_WRITABLE_BITS;
+            mstatus.raw &= ~MSTATUS_WRITABLE_BITS;
             value &= MSTATUS_WRITABLE_BITS;
-            mstatus |= value;
-            csrs[CSR_MSTATUS] = mstatus;
+            mstatus.raw |= value;
+            break;
+        }
+
+        case CSR_SSTATUS: {
+            sstatus.raw &= ~SSTATUS_WRITABLE_BITS;
+            value &= SSTATUS_WRITABLE_BITS;
+            sstatus.raw |= value;
             break;
         }
 
