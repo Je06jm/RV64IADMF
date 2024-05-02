@@ -287,57 +287,28 @@ public:
     static constexpr size_t REG_FT10 = 30;
     static constexpr size_t REG_FT11 = 31;
 
-    class TLBEntry {
-        VirtualMachine& vm;
-        uint32_t physical_address;
-        uint32_t table;
-        uint32_t table_entry;
+    union TLBEntry {
+        struct {
+            uint32_t V : 1;
+            uint32_t R : 1;
+            uint32_t W : 1;
+            uint32_t X : 1;
+            uint32_t U : 1;
+            uint32_t G : 1;
+            uint32_t A : 1;
+            uint32_t D : 1;
+            uint32_t RSW : 2;
+            uint32_t PPN_0 : 10;
+            uint32_t PPN_1 : 12;
+        };
+        struct {
+            uint32_t _unused : 10;
+            uint32_t PPN : 22;
+        };
+        uint32_t raw;
 
-    public:
-        TLBEntry(VirtualMachine& vm, uint32_t physical_address, uint32_t table, uint32_t table_entry) : vm{vm}, physical_address{physical_address}, table{table}, table_entry{table_entry} {}
-
-        inline TLBEntry& operator=(const TLBEntry& other) {
-            physical_address = other.physical_address;
-            table = other.table;
-            table_entry = other.table_entry;
-            return *this;
-        }
-
-        static constexpr uint32_t FLAG_VALID = (1<<0);
-        static constexpr uint32_t FLAG_READ = (1<<1);
-        static constexpr uint32_t FLAG_WRITE = (1<<2);
-        static constexpr uint32_t FLAG_EXECUTE = (1<<3);
-        static constexpr uint32_t FLAG_USER = (1<<4);
-        static constexpr uint32_t FLAG_GLOBAL = (1<<5);
-        static constexpr uint32_t FLAG_ACCESSED = (1<<6);
-        static constexpr uint32_t FLAG_DIRTY = (1<<7);
-        
-        static constexpr uint32_t PAGE_MASK = 0xfff;
-        static constexpr uint32_t MEGA_PAGE_MASK = 0x3fffff;
-
-        inline bool IsVirtual() const {
-            return (table == -1U);
-        }
-
-        inline bool IsMegaPage() const {
-            return IsFlagsSet(FLAG_READ | FLAG_WRITE | FLAG_EXECUTE);
-        }
-        
-        bool IsFlagsSet(uint32_t flags) const;
-        void SetFlags(uint32_t flags);
-        void ClearFlgs(uint32_t flags);
-        
-        bool IsInPage(uint32_t phys_address) const;
-        
-        uint32_t TranslateAddress(uint32_t phys_address) const;
-
-        bool CheckValid();
-        bool CheckExecution(bool as_user);
-        bool CheckRead(bool as_user);
-        bool CheckWrite(bool as_user);
-
-        inline static TLBEntry CreateNonVirtual(VirtualMachine& vm) {
-            return {vm, -1U, -1U, -1U};
+        inline bool IsLeaf() const {
+            return X || W || R;
         }
     };
     
@@ -345,6 +316,8 @@ private:
     std::vector<TLBEntry> tlb_cache;
 
     Memory& memory;
+
+    uint32_t TranslateMemoryAddress(uint32_t address, bool is_write) const;
 
     struct MemoryAccess {
         uint32_t m_read : 1;

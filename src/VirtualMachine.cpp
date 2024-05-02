@@ -228,6 +228,72 @@ bool VirtualMachine::CheckFloatErrors() {
     return false;
 }
 
+uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write) const {
+    union VirtualAddress {
+        struct {
+            uint32_t offset : 12;
+            uint32_t vpn_0 : 10;
+            uint32_t vpn_1 : 10;
+        };
+        uint32_t raw;
+    };
+
+    constexpr uint32_t PAGE_SIZE = 0x1000;
+
+    VirtualAddress vaddr;
+    vaddr.raw = address;
+
+    uint32_t root_table_address = csrs.at(CSR_SATP) << 12;
+
+    auto ReadTLBEntry = [&](uint32_t address) {
+        TLBEntry ppn;
+        auto ppn_read = memory.PeekWord(address);
+        if (!ppn_read.second)
+            throw std::runtime_error("Address translation failed, PPN access-fault");
+        
+        ppn.raw = ppn_read.second;
+        if (!ppn.V || (!ppn.R && ppn.W))
+            throw std::runtime_error("Address translation failed, PPN page-fault");
+        
+        return ppn;
+    };
+    auto ppn_1 = ReadTLBEntry(root_table_address + vaddr.vpn_1 * 4);
+
+    TLBEntry leaf;
+    bool super;
+    if (ppn_1.IsLeaf()) {
+        leaf = ppn_1;
+        super = true;
+    }
+    else {
+        leaf = ReadTLBEntry(ppn_1.PPN * PAGE_SIZE + vaddr.vpn_0 * 4);
+        super = false;
+
+        if (!leaf.IsLeaf())
+            throw std::runtime_error("Address translation failed, PPN page-fault");
+    }
+
+    // Check memory access here
+
+    if (super && leaf.PPN_0 != 0)
+        throw std::runtime_error("Address translation failed, PPN page-fault");
+    
+    if (!leaf.A || (leaf.D && is_write))
+        throw std::runtime_error("Address translation failed, page-fault");
+
+    uint32_t address = ppn_1.PPN_1 << 22;
+    if (super) {
+        address |= vaddr.vpn_0 << 12;
+    }
+    else {
+        address |= leaf.PPN_0 << 12;
+    }
+
+    address |= vaddr.offset;
+
+    return address;
+}
+
 VirtualMachine::MemoryAccess VirtualMachine::CheckMemoryAccess(uint32_t address) const {
     MemoryAccess maccess;
     maccess.m_read = 1;
