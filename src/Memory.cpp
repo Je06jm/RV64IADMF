@@ -162,6 +162,25 @@ std::pair<uint32_t, bool> Memory::PeekWord(uint32_t address) const {
     return {word, true};
 }
 
+bool Memory::TryWriteWord(uint32_t address, uint32_t word) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 3)
+        throw std::runtime_error(std::format("Unaligned write of word at {:#10x}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        return false;
+    
+    if (!region->writable)
+        return false;
+
+    region->WriteWord(address - region->base, word);
+    return true;
+}
+
 void Memory::WriteWord(uint32_t address, uint32_t word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));

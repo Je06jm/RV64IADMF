@@ -172,6 +172,7 @@ public:
     uint8_t ReadByte(uint32_t address) const;
 
     std::pair<uint32_t, bool> PeekWord(uint32_t address) const;
+    bool TryWriteWord(uint32_t address, uint32_t word);
 
     void WriteWord(uint32_t address, uint32_t word);
     void WriteHalf(uint32_t address, uint16_t half);
