@@ -7,6 +7,7 @@
 #include <cassert>
 #include <stdexcept>
 #include <cmath>
+#include <chrono>
 #include <fenv.h>
 
 #if defined(_WIN32) || defined(_WIN64)
@@ -18,7 +19,7 @@
 const int VirtualMachine::default_rounding_mode = fegetround();
 
 bool VirtualMachine::CSRPrivilegeCheck(uint32_t csr) {
-    if ((csr >= 0 && csr < 4) || (csr >= 0xc00 && csr < 0xcf0))
+    if (csr < 4 || (csr >= 0xc00 && csr < 0xcf0))
         return true;
     
     if ((csr >= 0x100 && csr < 0x121) || csr == CSR_SCONTEXT)
@@ -282,6 +283,13 @@ VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t ha
 
     csr_mapped_memory = std::make_shared<CSRMappedMemory>();
     memory.AddMemoryRegion(csr_mapped_memory);
+
+    auto now = std::chrono::system_clock::now();
+    auto epoch = now.time_since_epoch();
+    auto dur_ms = std::chrono::duration_cast<std::chrono::microseconds>(epoch);
+    
+    double ms = dur_ms.count() / 1000000.0;
+    csr_mapped_memory->time = ms * CSRMappedMemory::TICKS_PER_SECOND;
     
     Setup();
 }
@@ -1900,9 +1908,9 @@ void VirtualMachine::UpdateTime() {
     history_tick.push_back(ticks);
     ticks = 0;
     
-    csr_mapped_memory->time += static_cast<uint64_t>(delta_time() * 32768);
-    if (csr_mapped_memory->time >= csr_mapped_memory->time_cmp) {}
-    // TODO Trigger an interrupt
+    csr_mapped_memory->time += static_cast<uint64_t>(delta_time() * CSRMappedMemory::TICKS_PER_SECOND);
+    if (csr_mapped_memory->time >= csr_mapped_memory->time_cmp)
+        throw std::runtime_error("timecmp >= time");
 
     while (history_delta.size() > MAX_HISTORY) {
         history_delta.erase(history_delta.begin());

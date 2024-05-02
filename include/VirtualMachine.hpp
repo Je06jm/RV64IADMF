@@ -355,8 +355,9 @@ private:
 
     class CSRMappedMemory : public MemoryRegion {
     public:
-        uint64_t time;
-        uint64_t time_cmp;
+        static constexpr uint64_t TICKS_PER_SECOND = 32768;
+        uint64_t time = 0;
+        uint64_t time_cmp = -1ULL;
 
         CSRMappedMemory() : MemoryRegion{TYPE_MAPPED_CSRS, 0Xf00, 0x100, true, true} {}
 
