@@ -691,6 +691,10 @@ RVInstruction::operator std::string() {
             s = std::format("INVALID");
             break;
         
+        case Type::CUST_TVA:
+            s = std::format("CUST.TVA {}, {}", s_rd, s_rs1);
+            break;
+        
         default:
             s = std::format("Unknown instruction type {}", int(type));
             break;
@@ -903,6 +907,8 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
     static constexpr uint8_t FUNCT3_CSRRWI = 0b101;
     static constexpr uint8_t FUNCT3_CSRRSI = 0b110;
     static constexpr uint8_t FUNCT3_CSRRCI = 0b111;
+
+    static constexpr uint8_t OP_CUST_TVA = 0b1000000;
 
     union InstructionWord {
         struct {
@@ -1990,6 +1996,12 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
                     }
                     break;
             }
+            break;
+        
+        case OP_CUST_TVA:
+            rv.type = RVInstruction::Type::CUST_TVA;
+            rv.rd = iw.R.rd;
+            rv.rs1 = iw.R.rs1;
             break;
 
         default:

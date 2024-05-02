@@ -17,132 +17,6 @@
 
 const int VirtualMachine::default_rounding_mode = fegetround();
 
-bool VirtualMachine::TLBEntry::IsFlagsSet(uint32_t flags) const {
-    assert(IsVirtual());
-    
-    if (IsMegaPage()) {
-        return (vm.memory.ReadWord(table) & flags) == flags;
-    } else {
-        return (vm.memory.ReadWord(table_entry) & flags) == flags;
-    }
-}
-
-void VirtualMachine::TLBEntry::SetFlags(uint32_t flags) {
-    assert(IsVirtual());
-
-    if (IsMegaPage()) {
-        auto data = vm.memory.ReadWord(table);
-        vm.memory.WriteWord(table, data | flags);
-    } else {
-        auto data = vm.memory.ReadWord(table_entry);
-        vm.memory.WriteWord(table_entry, data | flags);
-    }
-}
-
-void VirtualMachine::TLBEntry::ClearFlgs(uint32_t flags) {
-    assert(IsVirtual());
-
-    if (IsMegaPage()) {
-        auto data = vm.memory.ReadWord(table);
-        vm.memory.WriteWord(table, data & ~flags);
-    } else {
-        auto data = vm.memory.ReadWord(table_entry);
-        vm.memory.WriteWord(table_entry, data & ~flags);
-    }
-}
-
-bool VirtualMachine::TLBEntry::IsInPage(uint32_t phys_address) const {
-    if (!IsVirtual()) return false;
-
-    if (IsMegaPage()) {
-        auto aligned_addr = phys_address & ~MEGA_PAGE_MASK;
-        return physical_address == aligned_addr;
-    } else {
-        auto aligned_addr = phys_address & ~PAGE_MASK;
-        return physical_address == aligned_addr;
-    }
-}
-
-uint32_t VirtualMachine::TLBEntry::TranslateAddress(uint32_t phys_address) const {
-    if (!IsVirtual()) return phys_address;
-
-    if (IsMegaPage()) {
-        return (physical_address & ~MEGA_PAGE_MASK) | (phys_address & MEGA_PAGE_MASK);
-    } else {
-        return (physical_address & ~PAGE_MASK) | (phys_address & PAGE_MASK);
-    }
-}
-
-bool VirtualMachine::TLBEntry::CheckValid() {
-    if (!IsFlagsSet(FLAG_VALID)) {
-        // Raise exception
-    }
-    return true;
-}
-
-bool VirtualMachine::TLBEntry::CheckExecution(bool as_user) {
-    if (!CheckValid()) {
-        return false;
-    }
-
-    if (!IsFlagsSet(FLAG_EXECUTE)) {
-        // Raise exception
-        return false;
-    }
-
-    if (as_user && !IsFlagsSet(FLAG_USER)) {
-        // Raise exception
-        return false;
-    }
-    else if (!as_user && IsFlagsSet(FLAG_USER)) {
-        // Raise exception
-        return false;
-    }
-
-    return true;
-}
-
-bool VirtualMachine::TLBEntry::CheckRead(bool as_user) {
-    if (!CheckValid()) {
-        return false;
-    }
-    
-    if (!IsFlagsSet(FLAG_READ)) {
-        // Raise exception
-        return false;
-    }
-
-    if (as_user && !IsFlagsSet(FLAG_USER)) {
-        // Raise exception
-        return false;
-    }
-
-    if (!as_user && IsFlagsSet(FLAG_USER) && (vm.csrs[CSR_SSTATUS] & (1ULL<<18)) == 0) {
-        // Raise exception
-        return false;
-    }
-
-    return true;
-}
-
-bool VirtualMachine::TLBEntry::CheckWrite(bool as_user) {
-    if (!CheckValid()) {
-        return false;
-    }
-
-    if (as_user && !IsFlagsSet(FLAG_WRITE)) {
-        // Raise exception
-        return false;
-    }
-
-    if (!as_user && IsFlagsSet(FLAG_USER) && (vm.csrs[CSR_SSTATUS] & (1ULL<<18)) == 0) {
-        // Raise exception
-        return false;
-    }
-
-    return true;
-}
-
 bool VirtualMachine::CSRPrivilegeCheck(uint32_t csr) {
     return true;
 }
@@ -251,7 +125,7 @@ uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write)
         if (!ppn_read.second)
             throw std::runtime_error("Address translation failed, PPN access-fault");
         
-        ppn.raw = ppn_read.second;
+        ppn.raw = ppn_read.first;
         if (!ppn.V || (!ppn.R && ppn.W))
             throw std::runtime_error("Address translation failed, PPN page-fault");
         
@@ -281,17 +155,18 @@ uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write)
     if (!leaf.A || (leaf.D && is_write))
         throw std::runtime_error("Address translation failed, page-fault");
 
-    uint32_t address = ppn_1.PPN_1 << 22;
+    uint32_t phys_address;
     if (super) {
-        address |= vaddr.vpn_0 << 12;
+        phys_address = leaf.PPN_1 << 22;
+        phys_address |= vaddr.vpn_0 << 12;
+        phys_address |= vaddr.offset;
     }
     else {
-        address |= leaf.PPN_0 << 12;
+        phys_address = leaf.PPN << 12;
+        phys_address |= vaddr.offset;
     }
 
-    address |= vaddr.offset;
-
-    return address;
+    return phys_address;
 }
 
 VirtualMachine::MemoryAccess VirtualMachine::CheckMemoryAccess(uint32_t address) const {
@@ -1874,6 +1749,10 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::SFENCE_INVAL_IR:
                 throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                break;
+            
+            case Type::CUST_TVA:
+                regs[instr.rd] = TranslateMemoryAddress(regs[instr.rs1], false);
                 break;
 
             case Type::INVALID:

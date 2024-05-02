@@ -509,9 +509,7 @@ std::vector<std::pair<uint32_t, bool>> Memory::PeekWords(uint32_t address, uint3
                 region = GetMemoryRegion(head);
             
             if (region) {
-                region->Lock();
                 data.push_back({region->ReadWord(head - region->base), true});
-                region->Unlock();
             }
             else
                 data.push_back({0, false});

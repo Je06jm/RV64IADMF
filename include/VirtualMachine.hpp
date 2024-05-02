@@ -161,10 +161,10 @@ public:
 
         union {
             struct {
-                uint32_t _unused0 : 4;
+                uint32_t _unused4 : 4;
                 uint32_t SBE : 1;
                 uint32_t MBE : 1;
-                uint32_t _unused1 : 26;
+                uint32_t _unused5 : 26;
             };
             uint32_t rawh;
         };
