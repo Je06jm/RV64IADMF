@@ -88,6 +88,15 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
         case CSR_MSTATUSH:
             return; // Non writable
         
+        case CSR_MSTATUS: {
+            uint32_t mstatus = csrs[CSR_MSTATUS];
+            mstatus &= ~MSTATUS_WRITABLE_BITS;
+            value &= MSTATUS_WRITABLE_BITS;
+            mstatus |= value;
+            csrs[CSR_MSTATUS] = mstatus;
+            break;
+        }
+
         default:
             csrs[csr] = value;
             break;

@@ -131,7 +131,7 @@ public:
     static constexpr uint16_t CSR_PERFORMANCE_EVENT_MAX = 32;
     static constexpr uint16_t CSR_MHPMEVENT3 = 0x323;
 
-    static constexpr uint32_t MSTATUS_WRITABLE_BITS = 0b0;
+    static constexpr uint32_t MSTATUS_WRITABLE_BITS = 0b10000000011011111111111110101010;
 
     union MStatus {
         struct {
