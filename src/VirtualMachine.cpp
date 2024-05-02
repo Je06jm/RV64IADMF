@@ -37,6 +37,17 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
     if (csr >= CSR_MHPMCOUNTER3H && csr < (CSR_MHPMCOUNTER3H + CSR_PERF_COUNTER_MAX - 3))
         return 0;
 
+    switch (csr) {
+        case CSR_MCYCLE:
+            return static_cast<uint32_t>(cycles);
+        
+        case CSR_MCYCLEH:
+            return static_cast<uint32_t>(cycles >> 32);
+        
+        default:
+            return csrs[csr];
+    }
+
     return csrs[csr];
 }
 
@@ -237,6 +248,8 @@ void VirtualMachine::Setup() {
     csrs[CSR_MSTATUS] = 0;
 
     privilege_level = PrivilegeLevel::Machine;
+
+    cycles = 0;
 }
 
 VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t hart_id) : memory{memory}, pc{starting_pc} {
@@ -401,7 +414,7 @@ bool VirtualMachine::Step(uint32_t steps) {
     constexpr uint64_t RV_F64_QNAN = 0xfff0000000000000;
     
     for (uint32_t i = 0; i < steps && running; i++) {
-        csrs[CSR_MCYCLE]++;
+        cycles++;
         
         if (pc & 0b11)
             throw std::runtime_error(std::format("Invalid PC address {:08x}", pc));
@@ -1822,6 +1835,8 @@ void VirtualMachine::GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers
 
 void VirtualMachine::GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs) const {
     csrs = this->csrs;
+    csrs[CSR_MCYCLE] = static_cast<uint32_t>(cycles);
+    csrs[CSR_MCYCLEH] = static_cast<uint32_t>(cycles >> 32);
 }
 
 VirtualMachine::TLBEntry VirtualMachine::GetTLBLookup(uint32_t phys_addr, bool bypass_cache) {

@@ -335,6 +335,7 @@ private:
     MemoryAccess CheckMemoryAccess(uint32_t address) const;
 
     uint32_t pc;
+    uint64_t cycles;
 
     bool running = false;
     bool paused = false;
