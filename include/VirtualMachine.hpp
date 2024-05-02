@@ -131,7 +131,7 @@ public:
     static constexpr uint16_t CSR_PERFORMANCE_EVENT_MAX = 32;
     static constexpr uint16_t CSR_MHPMEVENT3 = 0x323;
 
-    static constexpr uint32_t MSTATUS_WRITABLE_BITS = 0b10000000000011111111111110101010;
+    static constexpr uint32_t MSTATUS_WRITABLE_BITS = 0b10000000000011111111100110101010;
 
     union MStatus {
         struct {
@@ -144,17 +144,17 @@ public:
             uint32_t _unused3 : 1;
             uint32_t MPIE : 1;
             uint32_t SPP : 1;
-            uint32_t VS : 2;
+            uint32_t _unused4 : 2;
             uint32_t MMP : 2;
             uint32_t FS : 2;
             uint32_t XS : 2;
             uint32_t MPRIV : 1;
             uint32_t SUM : 1;
             uint32_t MXR : 1;
-            uint32_t _unused4 : 1;
             uint32_t _unused5 : 1;
             uint32_t _unused6 : 1;
-            uint32_t _unused7 : 8;
+            uint32_t _unused7 : 1;
+            uint32_t _unused8 : 8;
             uint32_t SD : 1;
         };
         uint32_t raw;
@@ -170,7 +170,7 @@ public:
         csrs[CSR_MSTATUS] = mstatus.raw;
     }
 
-    static constexpr uint32_t SSTATUS_WRITABLE_BITS = 0b10000000000011011110011100100010;
+    static constexpr uint32_t SSTATUS_WRITABLE_BITS = 0b10000000000011011110000100100010;
 
     union SStatus {
         struct {
@@ -181,14 +181,14 @@ public:
             uint32_t _unused2 : 1;
             uint32_t _unused3 : 1;
             uint32_t SPP : 1;
-            uint32_t VS : 2;
             uint32_t _unused4 : 2;
+            uint32_t _unused5 : 2;
             uint32_t FS : 2;
             uint32_t XS : 2;
-            uint32_t _unused5 : 1;
+            uint32_t _unused6 : 1;
             uint32_t SUM : 1;
             uint32_t MXR : 1;
-            uint32_t _unused6 : 11;
+            uint32_t _unused7 : 11;
             uint32_t SD : 1;
         };
         uint32_t raw;
