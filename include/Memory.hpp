@@ -19,6 +19,7 @@ public:
     static constexpr uint32_t TYPE_UNKNOWN = -1U;
     static constexpr uint32_t TYPE_UNUSED = 0;
     static constexpr uint32_t TYPE_PMA_ROM = 1;
+    static constexpr uint32_t TYPE_MAPPED_CSRS = 2;
     static constexpr uint32_t TYPE_BIOS_ROM = 4;
     static constexpr uint32_t TYPE_GENERAL_RAM = 5;
     static constexpr uint32_t TYPE_FRAMEBUFFER = 8;
@@ -120,7 +121,7 @@ private:
         const std::vector<std::shared_ptr<MemoryRegion>>& regions;
 
     public:
-        MemoryPMARom(std::vector<std::shared_ptr<MemoryRegion>>& regions) : MemoryRegion{TYPE_PMA_ROM, 0, 0x1000, true, false}, regions{regions} {}
+        MemoryPMARom(std::vector<std::shared_ptr<MemoryRegion>>& regions) : MemoryRegion{TYPE_PMA_ROM, 0, 0x200, true, false}, regions{regions} {}
 
         uint32_t ReadWord(uint32_t address) const override {
             address >>= 2;
@@ -148,6 +149,8 @@ private:
                     return flags;
                 }
             }
+
+            return 0;
         }
 
         void Lock() const override {}

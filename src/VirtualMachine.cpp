@@ -18,7 +18,13 @@
 const int VirtualMachine::default_rounding_mode = fegetround();
 
 bool VirtualMachine::CSRPrivilegeCheck(uint32_t csr) {
-    return true;
+    if ((csr >= 0 && csr < 4) || (csr >= 0xc00 && csr < 0xcf0))
+        return true;
+    
+    if ((csr >= 0x100 && csr < 0x121) || csr == CSR_SCONTEXT)
+        return privilege_level != PrivilegeLevel::User;
+    
+    return privilege_level == PrivilegeLevel::Machine;
 }
 
 uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
@@ -39,11 +45,19 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
 
     switch (csr) {
         case CSR_MCYCLE:
+        case CSR_CYCLE:
             return static_cast<uint32_t>(cycles);
         
         case CSR_MCYCLEH:
+        case CSR_CYCLEH:
             return static_cast<uint32_t>(cycles >> 32);
         
+        case CSR_TIME:
+            return static_cast<uint32_t>(csr_mapped_memory->time);
+        
+        case CSR_TIMEH:
+            return static_cast<uint32_t>(csr_mapped_memory->time >> 32);
+
         default:
             return csrs[csr];
     }
@@ -66,6 +80,10 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
         case CSR_MISA:
         case CSR_MINSTRET:
         case CSR_MINSTRETH:
+        case CSR_CYCLE:
+        case CSR_CYCLEH:
+        case CSR_TIME:
+        case CSR_TIMEH:
             return; // Non writable
         
         default:
@@ -261,6 +279,9 @@ VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t ha
     csrs[CSR_MHARTID] = hart_id;
 
     csrs[CSR_MISA] = ISA_32_BITS | ISA_A | ISA_D | ISA_F | ISA_I | ISA_M;
+
+    csr_mapped_memory = std::make_shared<CSRMappedMemory>();
+    memory.AddMemoryRegion(csr_mapped_memory);
     
     Setup();
 }
@@ -279,6 +300,9 @@ VirtualMachine::VirtualMachine(VirtualMachine&& vm) : memory{vm.memory}, pc{vm.p
     ticks = std::move(vm.ticks);
     history_delta = std::move(vm.history_delta);
     history_tick = std::move(vm.history_tick);
+    csr_mapped_memory = std::move(vm.csr_mapped_memory);
+    cycles = std::move(vm.cycles);
+    privilege_level = std::move(vm.privilege_level);
 }
 
 VirtualMachine::~VirtualMachine() {
@@ -1835,12 +1859,15 @@ void VirtualMachine::GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers
 
 void VirtualMachine::GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs) const {
     csrs = this->csrs;
-    csrs[CSR_MCYCLE] = static_cast<uint32_t>(cycles);
-    csrs[CSR_MCYCLEH] = static_cast<uint32_t>(cycles >> 32);
-}
+    auto mcycle = static_cast<uint32_t>(cycles);
+    auto mcycleh = static_cast<uint32_t>(cycles >> 32);
+    csrs[CSR_MCYCLE] = mcycle;
+    csrs[CSR_MCYCLEH] = mcycleh;
+    csrs[CSR_CYCLE] = mcycle;
+    csrs[CSR_CYCLEH] = mcycleh;
 
-VirtualMachine::TLBEntry VirtualMachine::GetTLBLookup(uint32_t phys_addr, bool bypass_cache) {
-    
+    csrs[CSR_TIME] = static_cast<uint32_t>(csr_mapped_memory->time);
+    csrs[CSR_TIMEH] = static_cast<uint32_t>(csr_mapped_memory->time >> 32);
 }
 
 size_t VirtualMachine::GetInstructionsPerSecond() {
@@ -1872,6 +1899,10 @@ void VirtualMachine::UpdateTime() {
     history_delta.push_back(delta_time());
     history_tick.push_back(ticks);
     ticks = 0;
+    
+    csr_mapped_memory->time += static_cast<uint64_t>(delta_time() * 32768);
+    if (csr_mapped_memory->time >= csr_mapped_memory->time_cmp) {}
+    // TODO Trigger an interrupt
 
     while (history_delta.size() > MAX_HISTORY) {
         history_delta.erase(history_delta.begin());

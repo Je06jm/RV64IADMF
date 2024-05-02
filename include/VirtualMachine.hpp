@@ -353,6 +353,39 @@ private:
 
     void Setup();
 
+    class CSRMappedMemory : public MemoryRegion {
+    public:
+        uint64_t time;
+        uint64_t time_cmp;
+
+        CSRMappedMemory() : MemoryRegion{TYPE_MAPPED_CSRS, 0Xf00, 0x100, true, true} {}
+
+        uint32_t ReadWord(uint32_t address) const override {
+            address >>= 2;
+
+            switch (address) {
+                case 0:
+                    return static_cast<uint32_t>(time);
+                
+                case 1:
+                    return static_cast<uint32_t>(time >> 32);
+                
+                case 2:
+                    return static_cast<uint32_t>(time_cmp);
+                
+                case 3:
+                    return static_cast<uint32_t>(time_cmp >> 32);
+            }
+
+            return 0;
+        }
+
+        void Lock() const override {}
+        void Unlock() const override {}
+    };
+
+    std::shared_ptr<CSRMappedMemory> csr_mapped_memory;
+
 public:
     VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t hart_id);
     VirtualMachine(const VirtualMachine&) = delete;
