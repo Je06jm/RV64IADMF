@@ -182,6 +182,37 @@ public:
         csrs[CSR_MSTATUSH] = mstatus.rawh;
     }
 
+    union SStatus {
+        struct {
+            uint32_t _unused0 : 1;
+            uint32_t SIE : 1;
+            uint32_t _unused1 : 3;
+            uint32_t SPIE : 1;
+            uint32_t UBE : 1;
+            uint32_t _unused2 : 1;
+            uint32_t SPP : 1;
+            uint32_t VS : 2;
+            uint32_t _unused3 : 2;
+            uint32_t FS : 2;
+            uint32_t XS : 2;
+            uint32_t _unused4 : 1;
+            uint32_t SUM : 1;
+            uint32_t MXR : 1;
+            uint32_t _unused5 : 11;
+            uint32_t SD : 1;
+        };
+        uint32_t raw;
+    };
+    inline SStatus ReadSStatus() const {
+        SStatus sstatus;
+        sstatus.raw = csrs.at(CSR_SSTATUS);
+        return sstatus;
+    }
+
+    inline void WriteSStatus(SStatus sstatus) {
+        csrs[CSR_SSTATUS] = sstatus.raw;
+    }
+
     static constexpr size_t REG_ZERO = 0;
     static constexpr size_t REG_RA = 1;
     static constexpr size_t REG_SP = 2;
