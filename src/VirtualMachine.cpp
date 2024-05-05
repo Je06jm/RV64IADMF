@@ -665,6 +665,9 @@ bool VirtualMachine::Step(uint32_t steps) {
     for (uint32_t i = 0; i < steps && running; i++) {
         cycles++;
 
+        if (waiting_for_interrupt)
+            continue;
+
         if (mstatus.MIE) {
             auto pending_interrupts = mip;
             pending_interrupts &= mie;
@@ -2315,7 +2318,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 continue;
             
             case Type::WFI:
-                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
+                waiting_for_interrupt = true;
                 break;
             
             case Type::SFENCE_VMA:
@@ -2397,6 +2400,7 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::BLT:
             case Type::BLTU:
             case Type::BNE:
+            case Type::WFI:
                 break;
             
             default:

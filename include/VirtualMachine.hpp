@@ -314,6 +314,8 @@ public:
     static constexpr uint32_t INTERRUPT_MACHINE_EXTERNAL = 0xa;
 
     void RaiseInterrupt(uint32_t cause);
+
+    bool waiting_for_interrupt = false;
 private:
     static constexpr uint32_t TRAP_INTERRUPT_BIT = (1ULL << 31);
 
