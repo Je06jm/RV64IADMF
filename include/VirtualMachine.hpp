@@ -21,9 +21,9 @@ public:
     static constexpr size_t REGISTER_COUNT = 32;
 
 private:
-    static constexpr uint8_t MACHINE_MODE = 0b00;
+    static constexpr uint8_t MACHINE_MODE = 0b11;
     static constexpr uint8_t SUPERVISOR_MODE = 0b01;
-    static constexpr uint8_t USER_MODE = 0b10;
+    static constexpr uint8_t USER_MODE = 0b00;
 
     static constexpr uint32_t ISA_BITS_MASK = 0b11 << 30;
     static constexpr uint32_t ISA_32_BITS = 1 << 30;
@@ -342,6 +342,9 @@ private:
     uint32_t mideleg;
     uint32_t sip;
     uint32_t sie;
+
+    void RaiseMachineTrap(uint32_t cause);
+    void RaiseSupervisorTrap(uint32_t cause);
 
     void RaiseTrap(uint32_t handler_address, uint32_t cause, PrivilegeLevel handler_privilege);
     

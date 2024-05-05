@@ -112,9 +112,14 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
             return; // Non writable
         
         case CSR_MSTATUS: {
+            auto last = mstatus.MPP;
             mstatus.raw &= ~MSTATUS_WRITABLE_BITS;
             value &= MSTATUS_WRITABLE_BITS;
             mstatus.raw |= value;
+
+            if (mstatus.MPP == 0b10)
+                mstatus.MPP = last;
+            
             break;
         }
 
@@ -214,33 +219,18 @@ void VirtualMachine::RaiseException(uint32_t cause) {
     auto cause_bit = 1ULL << cause;
 
     auto delegate = csrs[CSR_MEDELEG];
+
+    if (delegate & cause_bit)
+        RaiseSupervisorTrap(cause);
     
-    uint32_t handler_address;
-    PrivilegeLevel handler_privilege;
-
-    if (delegate & cause_bit) {
-        handler_address = csrs[CSR_STVEC];
-
-        csrs[CSR_SCAUSE] = cause;
-        csrs[CSR_SEPC] = pc;
-
-        handler_privilege = PrivilegeLevel::Supervisor;
-
-        handler_address = TranslateMemoryAddress(handler_address, false);
-    }
-    else {
-        handler_address = csrs[CSR_MTVEC];
-
-        csrs[CSR_MCAUSE] = cause;
-        csrs[CSR_SEPC] = pc;
-
-        handler_privilege = PrivilegeLevel::Machine;
-    }
-
-    RaiseTrap(handler_address, cause, handler_privilege);
+    else
+        RaiseMachineTrap(cause);
+    
 }
 
-void VirtualMachine::RaiseTrap(uint32_t handler_address, uint32_t cause, PrivilegeLevel handler_privilege) {
+void VirtualMachine::RaiseMachineTrap(uint32_t cause) {
+    auto handler_address = csrs[CSR_MTVEC];
+
     auto mode = handler_address & 0b11;
     handler_address &= ~0b11;
 
@@ -253,12 +243,75 @@ void VirtualMachine::RaiseTrap(uint32_t handler_address, uint32_t cause, Privile
             break;
         
         default:
-            throw std::runtime_error(std::format("Unhandled trap mode {}", mode));
+            throw std::runtime_error(std::format("Unhandled machine trap mode {}", mode));
+    }
+
+    csrs[CSR_MCAUSE] = cause;
+    csrs[CSR_MEPC] = pc;
+
+    mstatus.MPIE = mstatus.MIE;
+    mstatus.MIE = 0;
+
+    mstatus.SPIE = sstatus.SIE;
+
+    switch (privilege_level) {
+        case PrivilegeLevel::Machine:
+                mstatus.MPP = MACHINE_MODE;
+                break;
+            
+        case PrivilegeLevel::Supervisor:
+            mstatus.MPP = SUPERVISOR_MODE;
+            break;
+        
+        case PrivilegeLevel::User:
+            mstatus.MPP = USER_MODE;
             break;
     }
 
     pc = handler_address;
-    privilege_level = handler_privilege;
+    privilege_level = PrivilegeLevel::Machine;
+}
+
+void VirtualMachine::RaiseSupervisorTrap(uint32_t cause) {
+    auto handler_address = csrs[CSR_MTVEC];
+    handler_address = TranslateMemoryAddress(handler_address, false);
+
+    auto mode = handler_address & 0b11;
+    handler_address &= ~0b11;
+
+    switch (mode) {
+        case 0b00:
+            break;
+        
+        case 0b01:
+            handler_address += (cause & ~TRAP_INTERRUPT_BIT) * 4;
+            break;
+        
+        default:
+            throw std::runtime_error(std::format("Unhandled supervisor trap mode {}", mode));
+    }
+
+    csrs[CSR_SCAUSE] = cause;
+    csrs[CSR_SEPC] = pc;
+
+    mstatus.SPIE = mstatus.SIE;
+    mstatus.SIE = 0;
+
+    switch (privilege_level) {
+        case PrivilegeLevel::Supervisor:
+            sstatus.SPP = 0;
+            break;
+
+        case PrivilegeLevel::User:
+            sstatus.SPP = 1;
+            break;
+        
+        default:
+            throw std::runtime_error(std::format("Unhandled supervisor trap"));
+    }
+
+    pc = handler_address;
+    privilege_level = PrivilegeLevel::Machine;
 }
 
 uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write) const {
@@ -582,27 +635,7 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 for (uint32_t cause = 31; cause > 32; cause--) {
                     if (pending_interrupts & (1ULL << cause)) {
-                        mstatus.MPIE = mstatus.MIE;
-                        mstatus.MIE = 0;
-                        
-                        switch (privilege_level) {
-                            case PrivilegeLevel::Machine:
-                                mstatus.MPP = 0b00;
-                                break;
-                            
-                            case PrivilegeLevel::Supervisor:
-                                mstatus.MPP = 0b01;
-                                break;
-                            
-                            case PrivilegeLevel::User:
-                                mstatus.MPP = 0b10;
-                                break;
-                        }
-
-                        csrs[CSR_MCAUSE] = cause | TRAP_INTERRUPT_BIT;
-                        csrs[CSR_SEPC] = pc;
-
-                        RaiseTrap(handler_address, cause | TRAP_INTERRUPT_BIT, PrivilegeLevel::Machine);
+                        RaiseMachineTrap(cause | TRAP_INTERRUPT_BIT);
                         handled = true;
                         break;
                     }
@@ -618,15 +651,7 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                     for (uint32_t cause = 31; cause > 32; cause--) {
                         if (pending_interrupts & (1ULL << cause)) {
-                            sstatus.SPIE = sstatus.SIE;
-                            sstatus.SIE = 0;
-
-                            sstatus.SPP = privilege_level == PrivilegeLevel::Supervisor ? 0 : 1;
-
-                            csrs[CSR_SCAUSE] = cause | TRAP_INTERRUPT_BIT;
-                            csrs[CSR_SEPC] = pc;
-
-                            RaiseTrap(handler_address, cause | TRAP_INTERRUPT_BIT, PrivilegeLevel::Supervisor);
+                            RaiseSupervisorTrap(cause | TRAP_INTERRUPT_BIT);
                             break;
                         }
                     }
@@ -2064,12 +2089,52 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             case Type::SRET:
-                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
-                break;
+                if (privilege_level == PrivilegeLevel::User) {
+                    throw std::runtime_error("Cannot use SRET in user mode");
+                }
+
+                pc = csrs[CSR_SEPC];
+                sstatus.SIE = sstatus.SPIE;
+
+                if (sstatus.SPP)
+                    privilege_level = PrivilegeLevel::Supervisor;
+                
+                else
+                    privilege_level = PrivilegeLevel::User;
+                
+                continue;
             
             case Type::MRET:
-                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
-                break;
+                if (privilege_level == PrivilegeLevel::Supervisor) {
+                    RaiseInterrupt(INTERRUPT_SUPERVISOR_SOFTWARE);
+                    break;
+                }
+
+                if (privilege_level == PrivilegeLevel::User) {
+                    throw std::runtime_error(std::format("Cannot use MRET in user mode"));
+                }
+
+                pc = csrs[CSR_MEPC];
+                mstatus.MIE = mstatus.MPIE;
+                sstatus.SIE = mstatus.SPIE;
+
+                switch (mstatus.MPP) {
+                    case MACHINE_MODE:
+                        privilege_level = PrivilegeLevel::Machine;
+                        break;
+                    
+                    case SUPERVISOR_MODE:
+                        privilege_level = PrivilegeLevel::Supervisor;
+                        break;
+                    
+                    case USER_MODE:
+                        privilege_level = PrivilegeLevel::User;
+                        break;
+                    
+                    default:
+                        throw std::runtime_error("Cannot MRET to hypervisor");
+                }
+                continue;
             
             case Type::WFI:
                 throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
