@@ -218,7 +218,7 @@ void VirtualMachine::RaiseTrap(uint32_t handler_address, uint32_t cause, Privile
             break;
         
         default:
-            throw std::runtime_error(std::format("Unhandled trap mode {b}", mode));
+            throw std::runtime_error(std::format("Unhandled trap mode {}", mode));
             break;
     }
 
