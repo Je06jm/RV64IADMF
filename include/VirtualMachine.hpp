@@ -354,6 +354,17 @@ private:
 
     Memory& memory;
 
+    union SATP {
+        struct {
+            uint32_t PPN : 22;
+            uint32_t ASID : 9;
+            uint32_t MODE : 1;
+        };
+        uint32_t raw;
+    };
+
+    SATP satp;
+
     uint32_t TranslateMemoryAddress(uint32_t address, bool is_write) const;
 
     struct MemoryAccess {
