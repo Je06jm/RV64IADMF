@@ -929,10 +929,12 @@ bool VirtualMachine::Step(uint32_t steps) {
                 auto rhs = AsSigned(regs[instr.rs2]);
 
                 if (rhs == 0)
-                    throw std::runtime_error("Div by zero is not handled yet");
+                    regs[instr.rd] = -1U;
                 
-                regs[instr.rd] = AsUnsigned(lhs / rhs);
+                else
+                    regs[instr.rd] = AsUnsigned(lhs / rhs);
                 break;
+
             }
             
             case Type::DIVU: {
@@ -940,9 +942,11 @@ bool VirtualMachine::Step(uint32_t steps) {
                 auto rhs = regs[instr.rs2];
 
                 if (rhs == 0)
-                    throw std::runtime_error("Div by zero is not handled yet");
+                    regs[instr.rd] = -1U;
                 
-                regs[instr.rd] = lhs / rhs;
+                else
+                    regs[instr.rd] = lhs / rhs;
+
                 break;
             }
             
@@ -951,9 +955,11 @@ bool VirtualMachine::Step(uint32_t steps) {
                 auto rhs = AsSigned(regs[instr.rs2]);
 
                 if (rhs == 0)
-                    throw std::runtime_error("Div by zero is not handled yet");
+                    regs[instr.rd] = 0;
                 
-                regs[instr.rd] = AsUnsigned(lhs % rhs);
+                else
+                    regs[instr.rd] = AsUnsigned(lhs % rhs);
+
                 break;
             }
             
@@ -962,9 +968,11 @@ bool VirtualMachine::Step(uint32_t steps) {
                 auto rhs = regs[instr.rs2];
 
                 if (rhs == 0)
-                    throw std::runtime_error("Div by zero is not handled yet");
+                    regs[instr.rd] = 0;
                 
-                regs[instr.rd] = lhs % rhs;
+                else
+                    regs[instr.rd] = lhs % rhs;
+                    
                 break;
             }
             
