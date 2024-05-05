@@ -691,6 +691,14 @@ RVInstruction::operator std::string() {
             s = std::format("CUST.TVA {}, {}", s_rd, s_rs1);
             break;
         
+        case Type::CUST_MTRAP:
+            s = std::format("CUST.MTRAP {}", s_rs1);
+            break;
+        
+        case Type::CUST_STRAP:
+            s = std::format("CUST.STRAP {}", s_rs1);
+            break;
+
         default:
             s = std::format("Unknown instruction type {}", int(type));
             break;
@@ -2001,10 +2009,12 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
                 
                 case FUNCT7_CUST_MTRAP:
                     rv.type = RVInstruction::Type::CUST_MTRAP;
+                    rv.rs1 = iw.R.rs1;
                     break;
                 
                 case FUNCT7_CUST_STRAP:
                     rv.type = RVInstruction::Type::CUST_STRAP;
+                    rv.rs1 = iw.R.rs1;
                     break;
                 
                 default:
