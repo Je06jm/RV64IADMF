@@ -79,6 +79,14 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
         case CSR_SIE:
             return sie;
 
+        case CSR_MCOUNTEREN:
+        case CSR_MCOUNTINHIBIT:
+            return 0;
+        
+        case CSR_MENVCFG:
+        case CSR_MENVCFGH:
+            return 0;
+
         default:
             if (!csrs.contains(csr))
                 throw std::runtime_error("Read Invalid CSR");
@@ -106,6 +114,10 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
         case CSR_TIME:
         case CSR_TIMEH:
         case CSR_MSTATUSH:
+        case CSR_MCOUNTEREN:
+        case CSR_MCOUNTINHIBIT:
+        case CSR_MENVCFG:
+        case CSR_MENVCFGH:
             return; // Non writable
         
         case CSR_MSTATUS: {
@@ -437,6 +449,10 @@ void VirtualMachine::Setup() {
 
     csrs[CSR_MSTATUS] = 0;
     csrs[CSR_MTVEC] = 0;
+    csrs[CSR_MSCRATCH] = 0;
+
+    // TODO Implement this!
+    csrs[CSR_MCONFIGPTR] = 0;
 
     privilege_level = PrivilegeLevel::Machine;
 
