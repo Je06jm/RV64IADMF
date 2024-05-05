@@ -335,6 +335,8 @@ private:
 
     void RaiseException(uint32_t cause);
 
+    static constexpr uint32_t VALID_INTERRUPT_BITS = 0b0;
+
     uint32_t mip;
     uint32_t mie;
     uint32_t mideleg;

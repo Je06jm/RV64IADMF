@@ -66,6 +66,21 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
         case CSR_SSTATUS:
             sstatus.SD = sstatus.FS == FS_DIRTY;
             return sstatus.raw;
+        
+        case CSR_MIP:
+            return mip;
+        
+        case CSR_MIE:
+            return mie;
+        
+        case CSR_MIDELEG:
+            return mideleg;
+        
+        case CSR_SIP:
+            return sip;
+        
+        case CSR_SIE:
+            return sie;
 
         default:
             return csrs[csr];
@@ -109,6 +124,26 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
             sstatus.raw |= value;
             break;
         }
+
+        case CSR_MIP:
+            mip = value & VALID_INTERRUPT_BITS;
+            break;
+        
+        case CSR_MIE:
+            mie = value & VALID_INTERRUPT_BITS;
+            break;
+        
+        case CSR_MIDELEG:
+            mideleg = value & VALID_INTERRUPT_BITS;
+            break;
+        
+        case CSR_SIP:
+            sip = value & VALID_INTERRUPT_BITS;
+            break;
+        
+        case CSR_SIE:
+            sie = value & VALID_INTERRUPT_BITS;
+            break;
 
         default:
             csrs[csr] = value;
