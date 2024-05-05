@@ -2231,6 +2231,15 @@ void VirtualMachine::GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs
 
     csrs[CSR_TIME] = static_cast<uint32_t>(csr_mapped_memory->time);
     csrs[CSR_TIMEH] = static_cast<uint32_t>(csr_mapped_memory->time >> 32);
+
+    csrs[CSR_MIP] = mip;
+    csrs[CSR_MIE] = mie;
+    csrs[CSR_MIDELEG] = mideleg;
+    csrs[CSR_SIP] = sip;
+    csrs[CSR_SIE] = sie;
+
+    csrs[CSR_MSTATUS] = mstatus.raw;
+    csrs[CSR_SSTATUS] = sstatus.raw;
 }
 
 size_t VirtualMachine::GetInstructionsPerSecond() {
