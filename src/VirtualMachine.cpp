@@ -2162,10 +2162,12 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             case Type::CUST_MTRAP:
+                pc += 4;
                 RaiseMachineTrap(regs[instr.rs1]);
                 continue;
             
             case Type::CUST_STRAP:
+                pc += 4;
                 RaiseSupervisorTrap(regs[instr.rs1]);
                 continue;
 
