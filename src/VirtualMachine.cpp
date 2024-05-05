@@ -2493,7 +2493,7 @@ void VirtualMachine::UpdateTime() {
     
     csr_mapped_memory->time += static_cast<uint64_t>(delta_time() * CSRMappedMemory::TICKS_PER_SECOND);
     if (csr_mapped_memory->time >= csr_mapped_memory->time_cmp)
-        throw std::runtime_error("timecmp >= time");
+        RaiseInterrupt(INTERRUPT_MACHINE_TIMER);
 
     while (history_delta.size() > MAX_HISTORY) {
         history_delta.erase(history_delta.begin());
