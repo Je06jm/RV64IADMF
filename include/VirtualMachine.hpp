@@ -87,7 +87,6 @@ public:
     static constexpr uint16_t CSR_STVAL = 0x143;
     static constexpr uint16_t CSR_SIP = 0x144;
     static constexpr uint16_t CSR_SATP = 0x145;
-    static constexpr uint16_t CSR_SCONTEXT = 0x5a8;
 
     static constexpr uint16_t CSR_MVENDORID = 0xf11;
     static constexpr uint16_t CSR_MARCHID = 0xf12;

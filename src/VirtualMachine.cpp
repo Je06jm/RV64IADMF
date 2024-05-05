@@ -86,6 +86,9 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
         case CSR_MENVCFG:
         case CSR_MENVCFGH:
             return 0;
+        
+        case CSR_SENVCFG:
+            return 0;
 
         default:
             if (!csrs.contains(csr))
@@ -118,6 +121,7 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
         case CSR_MCOUNTINHIBIT:
         case CSR_MENVCFG:
         case CSR_MENVCFGH:
+        case CSR_SENVCFG:
             return; // Non writable
         
         case CSR_MSTATUS: {
@@ -435,15 +439,12 @@ void VirtualMachine::Setup() {
     csrs[CSR_SSTATUS] = 0;
     csrs[CSR_SIE] = 0;
     csrs[CSR_STVEC] = 0;
-    csrs[CSR_SCOUNTEREN] = 0;
-    csrs[CSR_SENVCFG] = 0;
     csrs[CSR_SSCRATCH] = 0;
     csrs[CSR_SEPC] = 0;
     csrs[CSR_SCAUSE] = 0;
     csrs[CSR_STVAL] = 0;
     csrs[CSR_SIP] = 0;
     csrs[CSR_SATP] = 0;
-    csrs[CSR_SCONTEXT] = 0;
 
     // Machine
 
