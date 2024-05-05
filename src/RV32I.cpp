@@ -692,11 +692,11 @@ RVInstruction::operator std::string() {
             break;
         
         case Type::CUST_MTRAP:
-            s = std::format("CUST.MTRAP {}", s_rs1);
+            s = std::format("CUST.MTRAP {}, {}", s_rs1, s_rs2);
             break;
         
         case Type::CUST_STRAP:
-            s = std::format("CUST.STRAP {}", s_rs1);
+            s = std::format("CUST.STRAP {}, {}", s_rs1, s_rs2);
             break;
 
         default:
@@ -2000,21 +2000,22 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
             break;
         
         case OP_CUST:
+            rv.rd = iw.R.rd;
+            rv.rs1 = iw.R.rs1;
+            rv.rs2 = iw.R.rs2;
+            rv.rd = iw.R.rd;
+            
             switch (iw.R.funct7) {
                 case FUNCT7_CUST_TVA:
                     rv.type = RVInstruction::Type::CUST_TVA;
-                    rv.rd = iw.R.rd;
-                    rv.rs1 = iw.R.rs1;
                     break;
                 
                 case FUNCT7_CUST_MTRAP:
                     rv.type = RVInstruction::Type::CUST_MTRAP;
-                    rv.rs1 = iw.R.rs1;
                     break;
                 
                 case FUNCT7_CUST_STRAP:
                     rv.type = RVInstruction::Type::CUST_STRAP;
-                    rv.rs1 = iw.R.rs1;
                     break;
                 
                 default:

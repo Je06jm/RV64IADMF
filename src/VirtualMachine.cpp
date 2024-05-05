@@ -2163,11 +2163,41 @@ bool VirtualMachine::Step(uint32_t steps) {
             
             case Type::CUST_MTRAP:
                 pc += 4;
+
+                switch (regs[instr.rs2] & 0b11) {
+                    case MACHINE_MODE:
+                        privilege_level = PrivilegeLevel::Machine;
+                        break;
+                    
+                    case SUPERVISOR_MODE:
+                        privilege_level = PrivilegeLevel::Supervisor;
+                        break;
+                    
+                    default:
+                        privilege_level = PrivilegeLevel::User;
+                        break;
+                }
+
                 RaiseMachineTrap(regs[instr.rs1]);
                 continue;
             
             case Type::CUST_STRAP:
                 pc += 4;
+
+                switch (regs[instr.rs2] & 0b11) {
+                    case MACHINE_MODE:
+                        privilege_level = PrivilegeLevel::Machine;
+                        break;
+                    
+                    case SUPERVISOR_MODE:
+                        privilege_level = PrivilegeLevel::Supervisor;
+                        break;
+                    
+                    default:
+                        privilege_level = PrivilegeLevel::User;
+                        break;
+                }
+                
                 RaiseSupervisorTrap(regs[instr.rs1]);
                 continue;
 
