@@ -133,7 +133,9 @@ struct RVInstruction {
         SFENCE_W_INVAL,
         SFENCE_INVAL_IR,
         INVALID,
-        CUST_TVA
+        CUST_TVA,
+        CUST_MTRAP,
+        CUST_STRAP
     };
 
     static constexpr uint8_t RM_ROUND_TO_NEAREST_TIES_EVEN = 0b000;

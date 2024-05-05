@@ -2159,6 +2159,14 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::CUST_TVA:
                 regs[instr.rd] = TranslateMemoryAddress(regs[instr.rs1], false);
                 break;
+            
+            case Type::CUST_MTRAP:
+                RaiseMachineTrap(regs[instr.rs1]);
+                continue;
+            
+            case Type::CUST_STRAP:
+                RaiseSupervisorTrap(regs[instr.rs1]);
+                continue;
 
             case Type::INVALID:
             default:
