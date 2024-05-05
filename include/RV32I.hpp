@@ -124,7 +124,6 @@ struct RVInstruction {
         FCVT_WU_D,
         FCVT_D_W,
         FCVT_D_WU,
-        URET,
         SRET,
         MRET,
         WFI,

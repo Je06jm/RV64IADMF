@@ -2084,10 +2084,6 @@ bool VirtualMachine::Step(uint32_t steps) {
                 
                 break;
             
-            case Type::URET:
-                throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
-                break;
-            
             case Type::SRET:
                 if (privilege_level == PrivilegeLevel::User) {
                     throw std::runtime_error("Cannot use SRET in user mode");

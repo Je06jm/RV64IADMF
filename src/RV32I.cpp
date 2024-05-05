@@ -651,10 +651,6 @@ RVInstruction::operator std::string() {
             s = std::format("FCVT.D.WU {}, {}", s_frd, s_rs1);
             break;
         
-        case Type::URET:
-            s = std::format("URET");
-            break;
-        
         case Type::SRET:
             s = std::format("SRET");
             break;
@@ -884,7 +880,6 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
     static constexpr uint16_t IMM_ECALL = 0b0;
     static constexpr uint16_t IMM_EBREAK = 0b000000000001;
 
-    static constexpr uint16_t IMM_URET = 0b000000000010;
     static constexpr uint16_t IMM_MRET = 0b000100000010;
     static constexpr uint16_t IMM_SRET = 0b001100000010;
     static constexpr uint8_t RS2_SRET_MRET = 0b00010;
@@ -1347,11 +1342,6 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
                         case IMM_EBREAK:
                             if (iw.I.rs1 != RS1_SYSTEM) break;
                             rv.type = RVInstruction::Type::EBREAK;
-                            break;
-                        
-                        case IMM_URET:
-                            if (iw.I.rs1 != RS1_SYSTEM) break;
-                            rv.type = RVInstruction::Type::URET;
                             break;
                         
                         case IMM_SRET:
