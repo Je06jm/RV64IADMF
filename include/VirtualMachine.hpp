@@ -365,7 +365,7 @@ private:
 
     SATP satp;
 
-    uint32_t TranslateMemoryAddress(uint32_t address, bool is_write) const;
+    uint32_t TranslateMemoryAddress(uint32_t address, bool is_write);
 
     struct MemoryAccess {
         uint32_t m_read : 1;
