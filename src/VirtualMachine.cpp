@@ -436,6 +436,7 @@ void VirtualMachine::Setup() {
     // Machine
 
     csrs[CSR_MSTATUS] = 0;
+    csrs[CSR_MTVEC] = 0;
 
     privilege_level = PrivilegeLevel::Machine;
 
