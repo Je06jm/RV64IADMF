@@ -32,9 +32,6 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
     if (!is_internal_read && !CSRPrivilegeCheck(csr))
         throw std::runtime_error("CSR Read Privilege");
     
-    if (!csrs.contains(csr))
-        throw std::runtime_error("Read Invalid CSR");
-    
     if (csr >= CSR_MHPMEVENT3 && csr < (CSR_MHPMEVENT3 + CSR_PERFORMANCE_EVENT_MAX - 3))
         return 0;
     
@@ -83,6 +80,9 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
             return sie;
 
         default:
+            if (!csrs.contains(csr))
+                throw std::runtime_error("Read Invalid CSR");
+
             return csrs[csr];
     }
 
@@ -92,9 +92,6 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
 void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
     if (!CSRPrivilegeCheck(csr))
         throw std::runtime_error("CSR Write Privilege");
-    
-    if (!csrs.contains(csr))
-        throw std::runtime_error("Write Invalid CSR");
     
     switch (csr) {
         case CSR_MVENDORID:
@@ -151,6 +148,9 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
             break;
 
         default:
+            if (!csrs.contains(csr))
+                throw std::runtime_error("Write Invalid CSR");
+
             csrs[csr] = value;
             break;
     }
