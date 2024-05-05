@@ -900,15 +900,29 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             case Type::ECALL:
-                if (!ecall_handlers.contains(regs[REG_A0]))
-                    EmptyECallHandler(csrs[CSR_MHARTID], memory, regs, fregs);
-                
-                else
-                    ecall_handlers[regs[REG_A0]](csrs[CSR_MHARTID], memory, regs, fregs);
-
+                switch (privilege_level) {
+                    case PrivilegeLevel::Machine:
+                        if (!ecall_handlers.contains(regs[REG_A0]))
+                            EmptyECallHandler(csrs[CSR_MHARTID], memory, regs, fregs);
+                        
+                        else
+                            ecall_handlers[regs[REG_A0]](csrs[CSR_MHARTID], memory, regs, fregs);
+                        break;
+                    
+                    case PrivilegeLevel::Supervisor:
+                        RaiseException(EXCEPTION_ENVIRONMENT_CALL_FROM_S_MODE);
+                        break;
+                    
+                    case PrivilegeLevel::User:
+                        RaiseException(EXCEPTION_ENVIRONMENT_CALL_FROM_U_MODE);
+                        break;
+                }
                 break;
             
             case Type::EBREAK:
+                if (privilege_level == PrivilegeLevel::User)
+                    RaiseException(EXCEPTION_BREAKPOINT);
+                
                 break;
             
             case Type::CSRRW: {
@@ -2312,6 +2326,9 @@ bool VirtualMachine::IsBreakPoint(uint32_t addr) {
         return false;
 
     RVInstruction instr = RVInstruction::FromUInt32(word.first);
+
+    if (privilege_level == PrivilegeLevel::User)
+        return false;
 
     return instr.type == RVInstruction::Type::EBREAK;
 }
