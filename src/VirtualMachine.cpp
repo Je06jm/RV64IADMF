@@ -166,6 +166,65 @@ bool VirtualMachine::CheckFloatErrors() {
     return false;
 }
 
+void VirtualMachine::RaiseInterrupt(uint32_t cause) {
+    auto cause_bit = 1ULL << cause;
+
+    static std::mutex lock;
+    lock.lock();
+    csrs[CSR_MIP] |= cause_bit;
+    lock.unlock();
+}
+
+void VirtualMachine::RaiseException(uint32_t cause) {
+    auto cause_bit = 1ULL << cause;
+
+    auto delegate = csrs[CSR_MEDELEG];
+    
+    uint32_t handler_address;
+    PrivilegeLevel handler_privilege;
+
+    if (delegate & cause_bit) {
+        handler_address = csrs[CSR_STVEC];
+
+        csrs[CSR_SCAUSE] = cause;
+        csrs[CSR_SEPC] = pc;
+
+        handler_privilege = PrivilegeLevel::Supervisor;
+
+        handler_address = TranslateMemoryAddress(handler_address, false);
+    }
+    else {
+        handler_address = csrs[CSR_MTVEC];
+
+        csrs[CSR_MCAUSE] = cause;
+        csrs[CSR_SEPC] = pc;
+
+        handler_privilege = PrivilegeLevel::Machine;
+    }
+
+    RaiseTrap(handler_address, cause, handler_privilege);
+}
+
+void VirtualMachine::RaiseTrap(uint32_t handler_address, uint32_t cause, PrivilegeLevel handler) {
+    auto mode = handler_address & 0b11;
+    handler_address &= ~0b11;
+
+    switch (mode) {
+        case 0b00:
+            break;
+        
+        case 0b01:
+            handler_address += (cause & ~TRAP_INTERRUPT_BIT) * 4;
+            break;
+        
+        default:
+            throw std::runtime_error(std::format("Unhandled trap mode {b}", mode));
+            break;
+    }
+
+    pc = handler_address;
+}
+
 uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write) const {
     union VirtualAddress {
         struct {
@@ -470,6 +529,74 @@ bool VirtualMachine::Step(uint32_t steps) {
     
     for (uint32_t i = 0; i < steps && running; i++) {
         cycles++;
+
+        if (mstatus.MIE) {
+            auto pending_interrupts = mip;
+            pending_interrupts &= mie;
+
+            auto delegated = pending_interrupts & mideleg;
+            sip |= delegated;
+
+            pending_interrupts &= ~delegated;
+
+            bool handled = false;
+
+            if (pending_interrupts) {
+                auto handler_address = csrs[CSR_MTVEC];
+
+                for (uint32_t cause = 31; cause > 32; cause--) {
+                    if (pending_interrupts & (1ULL << cause)) {
+                        mstatus.MPIE = mstatus.MIE;
+                        mstatus.MIE = 0;
+                        
+                        switch (privilege_level) {
+                            case PrivilegeLevel::Machine:
+                                mstatus.MPP = 0b00;
+                                break;
+                            
+                            case PrivilegeLevel::Supervisor:
+                                mstatus.MPP = 0b01;
+                                break;
+                            
+                            case PrivilegeLevel::User:
+                                mstatus.MPP = 0b10;
+                                break;
+                        }
+
+                        csrs[CSR_MCAUSE] = cause | TRAP_INTERRUPT_BIT;
+                        csrs[CSR_SEPC] = pc;
+
+                        RaiseTrap(handler_address, cause | TRAP_INTERRUPT_BIT, PrivilegeLevel::Machine);
+                        handled = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!handled && mstatus.SIE && sstatus.SIE) {
+                pending_interrupts = sip;
+                pending_interrupts &= sie;
+
+                if (pending_interrupts) {
+                    auto handler_address = csrs[CSR_STVEC];
+
+                    for (uint32_t cause = 31; cause > 32; cause--) {
+                        if (pending_interrupts & (1ULL << cause)) {
+                            sstatus.SPIE = sstatus.SIE;
+                            sstatus.SIE = 0;
+
+                            sstatus.SPP = privilege_level == PrivilegeLevel::Supervisor ? 0 : 1;
+
+                            csrs[CSR_SCAUSE] = cause | TRAP_INTERRUPT_BIT;
+                            csrs[CSR_SEPC] = pc;
+
+                            RaiseTrap(handler_address, cause | TRAP_INTERRUPT_BIT, PrivilegeLevel::Supervisor);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
         
         if (pc & 0b11)
             throw std::runtime_error(std::format("Invalid PC address {:08x}", pc));

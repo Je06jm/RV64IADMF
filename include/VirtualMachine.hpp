@@ -145,7 +145,7 @@ public:
             uint32_t MPIE : 1;
             uint32_t SPP : 1;
             uint32_t _unused4 : 2;
-            uint32_t MMP : 2;
+            uint32_t MPP : 2;
             uint32_t FS : 2;
             uint32_t _unused5 : 2;
             uint32_t MPRIV : 1;
@@ -306,8 +306,43 @@ public:
             return X || W || R;
         }
     };
-    
+
+    static constexpr uint32_t INTERRUPT_SUPERVISOR_SOFTWARE = 0x1;
+    static constexpr uint32_t INTERRUPT_MACHINE_SOFTWARE = 0x3;
+    static constexpr uint32_t INTERRUPT_SUPERVISOR_TIMER = 0x5;
+    static constexpr uint32_t INTERRUPT_MACHINE_TIMER = 0x7;
+    static constexpr uint32_t INTERRUPT_SUPERVISOR_EXTERNAL = 0x9;
+    static constexpr uint32_t INTERRUPT_MACHINE_EXTERNAL = 0xa;
+
+    void RaiseInterrupt(uint32_t cause);
 private:
+    static constexpr uint32_t TRAP_INTERRUPT_BIT = (1ULL << 31);
+
+    static constexpr uint32_t EXCEPTION_INSTRUCTION_ADDRESS_MISALIGNED = 0x0;
+    static constexpr uint32_t EXCEPTION_INSTRUCTION_ADDRESS_FAULT = 0x1;
+    static constexpr uint32_t EXCEPTION_ILLEGAL_INSTRUCTION = 0x2;
+    static constexpr uint32_t EXCEPTION_BREAKPOINT = 0x3;
+    static constexpr uint32_t EXCEPTION_LOAD_ADDRESS_MISALIGNED = 0x4;
+    static constexpr uint32_t EXCEPTION_LOAD_ACCESS_FAULT = 0x5;
+    static constexpr uint32_t EXCEPTION_STORE_AMO_ADDRESS_MISALIGNED = 0x6;
+    static constexpr uint32_t EXCEPTION_STORE_AMO_ACCESS_FAULT = 0x7;
+    static constexpr uint32_t EXCEPTION_ENVIRONMENT_CALL_FROM_U_MODE = 0x8;
+    static constexpr uint32_t EXCEPTION_ENVIRONMENT_CALL_FROM_S_MODE = 0x9;
+    static constexpr uint32_t EXCEPTION_ENVIRONMENT_CALL_FROM_M_MODE = 0xb;
+    static constexpr uint32_t EXCEPTION_INSTRUCTION_PAGE_FAULT = 0xc;
+    static constexpr uint32_t EXCEPTION_INSTRUCTION_LOAD_PAGE_FAULT = 0xd;
+    static constexpr uint32_t EXCEPTION_STORE_AMO_PAGE_FAULT = 0xf;
+
+    void RaiseException(uint32_t cause);
+
+    uint32_t mip;
+    uint32_t mie;
+    uint32_t mideleg;
+    uint32_t sip;
+    uint32_t sie;
+
+    void RaiseTrap(uint32_t handler_address, uint32_t cause, PrivilegeLevel handler_privilege);
+    
     MStatus mstatus;
     SStatus sstatus;
 
