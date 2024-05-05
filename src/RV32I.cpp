@@ -888,8 +888,8 @@ RVInstruction RVInstruction::FromUInt32(uint32_t instr) {
     static constexpr uint16_t IMM_ECALL = 0b0;
     static constexpr uint16_t IMM_EBREAK = 0b000000000001;
 
-    static constexpr uint16_t IMM_MRET = 0b000100000010;
-    static constexpr uint16_t IMM_SRET = 0b001100000010;
+    static constexpr uint16_t IMM_MRET = 0b001100000010;
+    static constexpr uint16_t IMM_SRET = 0b000100000010;
     static constexpr uint8_t RS2_SRET_MRET = 0b00010;
 
     static constexpr uint16_t IMM_WFI = 0b000100000101;
