@@ -296,7 +296,7 @@ void VirtualMachine::RaiseMachineTrap(uint32_t cause) {
 }
 
 void VirtualMachine::RaiseSupervisorTrap(uint32_t cause) {
-    auto handler_address = csrs[CSR_MTVEC];
+    auto handler_address = csrs[CSR_STVEC];
     handler_address = TranslateMemoryAddress(handler_address, false);
 
     auto mode = handler_address & 0b11;
@@ -334,7 +334,7 @@ void VirtualMachine::RaiseSupervisorTrap(uint32_t cause) {
     }
 
     pc = handler_address;
-    privilege_level = PrivilegeLevel::Machine;
+    privilege_level = PrivilegeLevel::Supervisor;
 }
 
 uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write) const {
@@ -349,6 +349,7 @@ uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write)
 
     constexpr uint32_t PAGE_SIZE = 0x1000;
 
+    if (privilege_level == PrivilegeLevel::Machine) return address;
     if (!satp.MODE) return address;
 
     VirtualAddress vaddr;
