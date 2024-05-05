@@ -22,7 +22,7 @@ bool VirtualMachine::CSRPrivilegeCheck(uint32_t csr) {
     if (csr < 4 || (csr >= 0xc00 && csr < 0xcf0))
         return true;
     
-    if ((csr >= 0x100 && csr < 0x121) || csr == CSR_SCONTEXT)
+    if ((csr >= 0x100 && csr < 0x121))
         return privilege_level != PrivilegeLevel::User;
     
     return privilege_level == PrivilegeLevel::Machine;
@@ -89,6 +89,9 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
         
         case CSR_SENVCFG:
             return 0;
+        
+        case CSR_SATP:
+            return satp.raw;
 
         default:
             if (!csrs.contains(csr))
@@ -161,6 +164,10 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
         
         case CSR_SIE:
             sie = value & VALID_INTERRUPT_BITS;
+            break;
+
+        case CSR_SATP:
+            satp.raw = value;
             break;
 
         default:
@@ -342,10 +349,12 @@ uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write)
 
     constexpr uint32_t PAGE_SIZE = 0x1000;
 
+    if (!satp.MODE) return address;
+
     VirtualAddress vaddr;
     vaddr.raw = address;
 
-    uint32_t root_table_address = csrs.at(CSR_SATP) << 12;
+    uint32_t root_table_address = satp.PPN << 12;
 
     auto ReadTLBEntry = [&](uint32_t address) {
         TLBEntry ppn;
@@ -444,7 +453,8 @@ void VirtualMachine::Setup() {
     csrs[CSR_SCAUSE] = 0;
     csrs[CSR_STVAL] = 0;
     csrs[CSR_SIP] = 0;
-    csrs[CSR_SATP] = 0;
+    
+    satp.raw = 0;
 
     // Machine
 
@@ -2304,6 +2314,8 @@ void VirtualMachine::GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs
 
     csrs[CSR_MSTATUS] = mstatus.raw;
     csrs[CSR_SSTATUS] = sstatus.raw;
+
+    csrs[CSR_SATP] = satp.raw;
 }
 
 size_t VirtualMachine::GetInstructionsPerSecond() {

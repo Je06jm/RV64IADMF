@@ -32,7 +32,6 @@ void GUICSR::Draw() {
         CSRTuple(VM::CSR_STVAL, "stval", false),
         CSRTuple(VM::CSR_SIP, "sip", false),
         CSRTuple(VM::CSR_SATP, "satp", false),
-        CSRTuple(VM::CSR_SCONTEXT, "scontext", false),
         CSRTuple(VM::CSR_MVENDORID, "mvendorid", false),
         CSRTuple(VM::CSR_MARCHID, "marchid", false),
         CSRTuple(VM::CSR_MIMPID, "mimpid", false),
