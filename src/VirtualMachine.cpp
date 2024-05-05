@@ -205,7 +205,7 @@ void VirtualMachine::RaiseException(uint32_t cause) {
     RaiseTrap(handler_address, cause, handler_privilege);
 }
 
-void VirtualMachine::RaiseTrap(uint32_t handler_address, uint32_t cause, PrivilegeLevel handler) {
+void VirtualMachine::RaiseTrap(uint32_t handler_address, uint32_t cause, PrivilegeLevel handler_privilege) {
     auto mode = handler_address & 0b11;
     handler_address &= ~0b11;
 
@@ -223,6 +223,7 @@ void VirtualMachine::RaiseTrap(uint32_t handler_address, uint32_t cause, Privile
     }
 
     pc = handler_address;
+    privilege_level = handler_privilege;
 }
 
 uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write) const {
@@ -972,7 +973,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 
                 else
                     regs[instr.rd] = lhs % rhs;
-                    
+
                 break;
             }
             
