@@ -50,15 +50,15 @@ void GUIHart::Draw() {
 
         switch (vm->privilege_level) {
             case VirtualMachine::PrivilegeLevel::Machine:
-                ImGui::Text("Privilege Level: MACHINE");
+                ImGui::Text("Privilege Level: Machine");
                 break;
             
             case VirtualMachine::PrivilegeLevel::Supervisor:
-                ImGui::Text("Privilege Level: SUPERVISOR");
+                ImGui::Text("Privilege Level: Supervisor");
                 break;
             
             case VirtualMachine::PrivilegeLevel::User:
-                ImGui::Text("Privilege Level: USER");
+                ImGui::Text("Privilege Level: User");
                 break;
             
             default:
