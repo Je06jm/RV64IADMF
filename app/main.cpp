@@ -9,6 +9,7 @@
 #include <GUIAssembly.hpp>
 #include <GUIInfo.hpp>
 #include <GUIRegs.hpp>
+#include <GUIHart.hpp>
 #include <GUIStack.hpp>
 #include <GUICSR.hpp>
 
@@ -98,7 +99,8 @@ int main(int argc, const char** argv) {
 
         GUIMemoryViewer mem_viewer(memory, vms[0], 0x0);
         GUIAssembly assembly(vms[0], memory);
-        GUIInfo info(memory, vms[0], harts);
+        GUIInfo info(memory, vms[0]);
+        GUIHart gui_harts(vms, harts);
         GUIRegs state(vms[0]);
         GUIStack stack(vms[0], memory);
         GUICSR csr(vms[0]);
@@ -138,7 +140,7 @@ int main(int argc, const char** argv) {
             for (auto& vm : vms)
                 vm->UpdateTime();
 
-            auto vm = vms[info.GetSelectedHart()];
+            auto vm = vms[gui_harts.GetSelectedHart()];
             mem_viewer.vm = vm;
             assembly.vm = vm;
             info.vm = vm;
@@ -162,6 +164,7 @@ int main(int argc, const char** argv) {
             mem_viewer.Draw();
             assembly.Draw();
             info.Draw();
+            gui_harts.Draw();
             state.Draw();
             stack.Draw();
             csr.Draw();

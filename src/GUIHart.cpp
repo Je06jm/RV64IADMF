@@ -7,6 +7,8 @@
 void GUIHart::Draw() {
     using VM = VirtualMachine;
 
+    auto vm = vms[selected_hart];
+
     if (ImGui::Begin("Hart")) {
         ImGui::BeginChild("Current Hart Child", ImVec2(150, 20));
 

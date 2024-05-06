@@ -8,9 +8,9 @@ class GUIHart {
     const std::vector<uint32_t> harts;
     
 public:
-    std::shared_ptr<VirtualMachine> vm;
+    std::vector<std::shared_ptr<VirtualMachine>> vms;
 
-    GUIHart(std::shared_ptr<VirtualMachine> vm, const std::vector<uint32_t>& harts) : vm{vm}, harts{harts} {}
+    GUIHart(std::vector<std::shared_ptr<VirtualMachine>> vms, const std::vector<uint32_t>& harts) : vms{vms}, harts{harts} {}
     ~GUIHart() = default;
 
     inline uint32_t GetSelectedHart() const {
