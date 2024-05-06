@@ -29,18 +29,6 @@ void GUIInfo::Draw() {
         } else {
             ImGui::Text("Host memory size: %.2f GiBs", hm_gbs);
         }
-        
-        auto ips = vm->GetInstructionsPerSecond();
-        auto k_ips = ips / 1000.0f;
-        auto m_ips = k_ips / 1000.0f;
-
-        if (k_ips < 1.0) {
-            ImGui::Text("IPC: %llu", ips);
-        } else if (m_ips < 1.0) {
-            ImGui::Text("IPC: %.2fK", k_ips);
-        } else {
-            ImGui::Text("IPC: %.2fM", m_ips);
-        }
     }
 
     ImGui::End();
