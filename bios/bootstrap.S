@@ -9,12 +9,6 @@ _start:
     li t0, 1
     la sp, stack_top
 
-    la t0, handler_mtrap
-    csrw mtvec, t0
-
-    la t0, handler_strap
-    csrw stvec, t0
-
     csrr t0, mvendorid
     csrr t1, marchid
     csrr t2, mimpid
@@ -51,40 +45,65 @@ machine_break:
     ebreak
     ret
 
-.global cust_mtrap
-cust_mtrap:
-    ebreak
-    addi sp, sp, -4
-    sw ra, (sp)
-    mv x0, x0
-    lw ra, (sp)
-    add sp, sp, 4
+.globl set_vtable_addr
+set_vtable_addr:
+    csrw satp, a0
     ret
 
-.global cust_strap
-cust_strap:
-    ebreak
-    addi sp, sp, -4
-    sw ra, (sp)
-    mv x0, x0
-    lw ra, (sp)
-    add sp, sp, 4
-    ret
+.global enable_smode
+enable_smode:
+    // Set reset vector
+    la t0, .smode
+    csrw mepc, t0
 
-.extern mtrap_handler
-.extern strap_handler
+    // Set reset privilege to supervisor
+    csrr t0, mstatus
+    li t1, 0b1100000000000
+    not t1, t1
+    and t0, t0, t1
+    li t1, 0b100000000000
+    or t0, t0, t1
+    csrw mstatus, t0
 
-handler_mtrap:
-    ebreak
-    call mtrap_handler
+    // Setup machine ebreak
+    la t0, .mmode
+    csrw mtvec, t0
+
     ebreak
     mret
 
-handler_strap:
+.smode:
+    // Enable virtual memory
+    csrr t0, satp
+    li t1, 0x80000000
+    or t0, t0, t1
+    csrw satp, t0
+    
+    ret
+
+.mmode:
+    // Forward machine calls
     ebreak
-    call strap_handler
-    ebreak
-    sret
+    ecall
+    addi sp, sp, -8
+    sw t0, (sp)
+    sw t1, 4(sp)
+
+    csrr t0, mcause
+    li t1, 0x80000000
+    and t0, t0, t1
+    beq t0, t1, .dont_inc_pc
+
+    csrr t0, mepc
+    addi t0, t0, 4
+    csrw mepc, t0
+
+.dont_inc_pc:
+    lw t0, (sp)
+    lw t1, 4(sp)
+    addi sp, sp, 8
+
+    mret
 
 .data
 
