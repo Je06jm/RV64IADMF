@@ -41,25 +41,6 @@ void GUIInfo::Draw() {
         } else {
             ImGui::Text("IPC: %.2fM", m_ips);
         }
-
-        ImGui::BeginChild("Current Hart Child", ImVec2(150, 20));
-
-        if (ImGui::BeginCombo("Hart", std::format("{}", harts[selected_hart]).c_str(), 0)) {
-            for (size_t i = 0; i < harts.size(); i++) {
-                bool is_selected = selected_hart == i;
-                if (ImGui::Selectable(std::format("{}", harts[i]).c_str(), is_selected, 0)) {
-                    selected_hart = i;
-                    is_selected = true;
-                }
-
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-
-            ImGui::EndCombo();
-        }
-
-        ImGui::EndChild();
     }
 
     ImGui::End();

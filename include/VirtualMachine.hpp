@@ -338,11 +338,11 @@ private:
 
     static constexpr uint32_t VALID_INTERRUPT_BITS = 0b0;
 
-    uint32_t mip;
-    uint32_t mie;
-    uint32_t mideleg;
-    uint32_t sip;
-    uint32_t sie;
+    uint32_t mip = 0;
+    uint32_t mie = 0;
+    uint32_t mideleg = 0;
+    uint32_t sip = 0;
+    uint32_t sie = 0;
 
     void RaiseMachineTrap(uint32_t cause);
     void RaiseSupervisorTrap(uint32_t cause);
@@ -370,6 +370,26 @@ private:
 public:
     inline bool IsUsingVirtualMemory() const {
         return (privilege_level != PrivilegeLevel::Machine) && (satp.MODE != 0);
+    }
+
+    inline uint32_t GetPendingMachineInterrupts() const {
+        return mip;
+    }
+
+    inline uint32_t GetEnabledMachineInterrupts() const {
+        return mie;
+    }
+
+    inline uint32_t GetDelegatedMachineInterrupts() const {
+        return mideleg;
+    }
+
+    inline uint32_t GetPendingSupervisorInterrupts() const {
+        return sip;
+    }
+
+    inline uint32_t GetEnabledSupervisorInterrupts() const {
+        return sie;
     }
 
 private:
