@@ -22,7 +22,7 @@ bool VirtualMachine::CSRPrivilegeCheck(uint32_t csr) {
     if (csr < 4 || (csr >= 0xc00 && csr < 0xcf0))
         return true;
     
-    if ((csr >= 0x100 && csr < 0x121))
+    if ((csr >= 0x100 && csr < 0x144) || csr == 0x180)
         return privilege_level != PrivilegeLevel::User;
     
     return privilege_level == PrivilegeLevel::Machine;
@@ -304,8 +304,9 @@ void VirtualMachine::RaiseMachineTrap(uint32_t cause) {
 }
 
 void VirtualMachine::RaiseSupervisorTrap(uint32_t cause) {
-    auto handler_address = csrs[CSR_STVEC];
-    handler_address = TranslateMemoryAddress(handler_address, false);
+    auto [handler_address, valid] = TranslateMemoryAddress(csrs[CSR_STVEC], false, false);
+
+    if (!valid) return;
 
     auto mode = handler_address & 0b11;
     handler_address &= ~0b11;
@@ -345,7 +346,25 @@ void VirtualMachine::RaiseSupervisorTrap(uint32_t cause) {
     privilege_level = PrivilegeLevel::Supervisor;
 }
 
-uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write) {
+std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(uint32_t virt_addr, bool bypass_cache, bool is_amo) {
+    constexpr auto KB_OFFSET_BITS = GetLog2(0x1000);
+    constexpr auto MB_OFFSET_BITS = GetLog2(0x200000);
+
+    auto kb_tag = (virt_addr & ~((1ULL << KB_OFFSET_BITS) - 1)) >> 1;
+    auto mb_tag = (virt_addr & ~((1ULL << MB_OFFSET_BITS) - 1)) >> 1;
+
+    if (!bypass_cache) {
+        for (size_t i = 0; i < tlb_cache.size(); i++) {
+            if (!tlb_cache[i].tlb_entry.V) continue;
+
+            if (tlb_cache[i].super && (mb_tag == tlb_cache[i].tag))
+                return {tlb_cache[i].tlb_entry, true};
+            
+            if (!tlb_cache[i].super && (kb_tag == tlb_cache[i].tag))
+                return {tlb_cache[i].tlb_entry, false};
+        }
+    }
+
     union VirtualAddress {
         struct {
             uint32_t offset : 12;
@@ -355,12 +374,8 @@ uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write)
         uint32_t raw;
     };
 
-    constexpr uint32_t PAGE_SIZE = 0x1000;
-
-    if (!IsUsingVirtualMemory()) return address;
-
     VirtualAddress vaddr;
-    vaddr.raw = address;
+    vaddr.raw = virt_addr;
 
     uint32_t root_table_address = satp.PPN << 12;
 
@@ -369,7 +384,7 @@ uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write)
         ppn.V = 0;
         auto ppn_read = memory.PeekWord(address);
         if (!ppn_read.second) {
-            RaiseException(EXCEPTION_LOAD_ACCESS_FAULT);
+            RaiseException(is_amo ? EXCEPTION_STORE_AMO_ACCESS_FAULT : EXCEPTION_LOAD_ACCESS_FAULT);
             return ppn;
         }
         
@@ -378,71 +393,119 @@ uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write)
             RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
             return ppn;
         }
+
+        if (!ppn.X && !ppn.W && ppn.R) {
+            RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
+            ppn.V = 0;
+            return ppn;
+        }
+
+        if (ppn.X && ppn.W && !ppn.R) {
+            RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
+            ppn.V = 0;
+            return ppn;
+        }
         
         return ppn;
     };
-    auto ppn_1 = ReadTLBEntry(root_table_address + vaddr.vpn_1 * 4);
-    if (!ppn_1.V) return 0;
 
-    TLBEntry leaf;
-    bool super;
-    if (ppn_1.IsLeaf()) {
-        leaf = ppn_1;
-        super = true;
+    auto& cache = tlb_cache[tlb_cache_round_robin];
+    tlb_cache_round_robin++;
+    if (tlb_cache_round_robin >= TLB_CACHE_SIZE) tlb_cache_round_robin = 0;
+
+    cache = TLBCacheEntry();
+
+    auto tlb = ReadTLBEntry(root_table_address + vaddr.vpn_1 * 4);
+
+    if (!tlb.V) return {tlb, false};
+
+    if (!tlb.R && !tlb.X) {
+        constexpr uint32_t PAGE_SIZE = 0x1000;
+        tlb = ReadTLBEntry(tlb.PPN * PAGE_SIZE + vaddr.vpn_0 * 4);
+
+        cache.tag = kb_tag;
+        cache.tlb_entry = tlb;
     }
     else {
-        leaf = ReadTLBEntry(ppn_1.PPN * PAGE_SIZE + vaddr.vpn_0 * 4);
-        if (!leaf.V) return 0;
-
-        super = false;
-
-        if (!leaf.IsLeaf()) {
-            RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
-            return 0;
+        if (tlb.PPN_0 != 0) {
+            RaiseMachineTrap(EXCEPTION_INSTRUCTION_PAGE_FAULT);
+            tlb.V = 0;
+            return {tlb, false};
         }
+        
+        cache.tag = mb_tag;
+        cache.super = 1;
+        cache.tlb_entry = tlb;
     }
 
-    // Check memory access here
+    return {tlb, cache.super != 0};
+}
 
-    if (super && leaf.PPN_0 != 0) {
-        RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
-        return 0;
-    }
+std::pair<uint32_t, bool> VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write, bool is_execute, bool is_amo) {
+    if (!IsUsingVirtualMemory()) return {address, true};
     
-    if (!leaf.A || (leaf.D && is_write)) {
+    auto [tlb, super] = GetTLBLookup(address);
+
+    if (!tlb.V) return {0, false};
+
+    if (is_execute && !tlb.X) {
         RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
-        return 0;
+        return {0, false};
     }
+
+    if (is_write && !tlb.W) {
+        RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
+        return {0, false};
+    }
+
+    if (!is_write && !tlb.R) {
+        RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
+        return {0, false};
+    }
+
+    if (is_amo && (!tlb.R || !tlb.W)) {
+        RaiseException(EXCEPTION_STORE_AMO_PAGE_FAULT);
+    }
+
+    if (privilege_level == PrivilegeLevel::User && !tlb.U) {
+        RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
+        return {0, false};
+    }
+
+    if (privilege_level == PrivilegeLevel::Supervisor && tlb.U && !sstatus.SUM) {
+        RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
+        return {0, false};
+    }
+
+    if (!tlb.A || (tlb.D && is_write)) {
+        RaiseException(EXCEPTION_INSTRUCTION_PAGE_FAULT);
+        return {0, false};
+    }
+
+    union VirtualAddress {
+        struct {
+            uint32_t offset : 12;
+            uint32_t vpn_0 : 10;
+            uint32_t vpn_1 : 10;
+        };
+        uint32_t raw;
+    };
+
+    VirtualAddress vaddr;
+    vaddr.raw = address;
 
     uint32_t phys_address;
     if (super) {
-        phys_address = leaf.PPN_1 << 22;
+        phys_address = tlb.PPN_1 << 22;
         phys_address |= vaddr.vpn_0 << 12;
         phys_address |= vaddr.offset;
     }
     else {
-        phys_address = leaf.PPN << 12;
+        phys_address = tlb.PPN << 12;
         phys_address |= vaddr.offset;
     }
 
-    return phys_address;
-}
-
-VirtualMachine::MemoryAccess VirtualMachine::CheckMemoryAccess(uint32_t address) const {
-    MemoryAccess maccess;
-    maccess.m_read = 1;
-    maccess.m_write = 1;
-    maccess.m_execute = 1;
-    maccess.s_read = 1;
-    maccess.s_write = 1;
-    maccess.s_execute = 1;
-    maccess.u_read = 1;
-    maccess.u_write = 1;
-    maccess.u_execute = 1;
-    maccess.address_present = 1;
-    maccess.translated_address = address;
-
-    return maccess;
+    return {phys_address, true};
 }
 
 void VirtualMachine::Setup() {
@@ -475,6 +538,8 @@ void VirtualMachine::Setup() {
     csrs[CSR_SCAUSE] = 0;
     csrs[CSR_STVAL] = 0;
     csrs[CSR_SIP] = 0;
+    csrs[CSR_SCAUSE] = 0;
+    csrs[CSR_SEPC] = 0;
     
     satp.raw = 0;
 
@@ -483,6 +548,8 @@ void VirtualMachine::Setup() {
     csrs[CSR_MSTATUS] = 0;
     csrs[CSR_MTVEC] = 0;
     csrs[CSR_MSCRATCH] = 0;
+    csrs[CSR_MCAUSE] = 0;
+    csrs[CSR_MEPC] = 0;
 
     // TODO Implement this!
     csrs[CSR_MCONFIGPTR] = 0;
@@ -712,12 +779,11 @@ bool VirtualMachine::Step(uint32_t steps) {
             RaiseException(EXCEPTION_INSTRUCTION_ADDRESS_FAULT);
             continue;
         }
-        
-        auto maccess_instr = CheckMemoryAccess(pc);
-        if (!maccess_instr.address_present)
-            throw std::runtime_error(std::format("PC address is not present (Missing page?) {:08x}", pc));
 
-        auto instr = RVInstruction::FromUInt32(memory.ReadWord(maccess_instr.translated_address));
+        auto [translated_address, translation_valid] = TranslateMemoryAddress(pc, false, true);
+        if (!translation_valid) continue;
+        
+        auto instr = RVInstruction::FromUInt32(memory.ReadWord(translated_address));
 
         switch (instr.type) {
             case Type::LUI:
@@ -802,37 +868,61 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             }
             
-            case Type::LB: 
-                regs[instr.rd] = SignExtend(memory.ReadByte(regs[instr.rs1] + instr.immediate), 7);
+            case Type::LB: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                if (!translation_valid) continue;
+                regs[instr.rd] = SignExtend(memory.ReadByte(translated_address), 7);
                 break;
+            }
             
-            case Type::LH:
-                regs[instr.rd] = SignExtend(memory.ReadHalf(regs[instr.rs1] + instr.immediate), 15);
+            case Type::LH: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                if (!translation_valid) continue;
+                regs[instr.rd] = SignExtend(memory.ReadHalf(translated_address), 15);
                 break;
+            }
             
-            case Type::LW:
-                regs[instr.rd] = memory.ReadWord(regs[instr.rs1] + instr.immediate);
+            case Type::LW: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                if (!translation_valid) continue;
+                regs[instr.rd] = memory.ReadWord(translated_address);
                 break;
+            }
 
-            case Type::LBU:
-                regs[instr.rd] = memory.ReadByte(regs[instr.rs1] + instr.immediate);
+            case Type::LBU: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                if (!translation_valid) continue;
+                regs[instr.rd] = memory.ReadByte(translated_address);
                 break;
+            }
             
-            case Type::LHU:
-                regs[instr.rd] = memory.ReadHalf(regs[instr.rs1] + instr.immediate);
+            case Type::LHU: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                if (!translation_valid) continue;
+                regs[instr.rd] = memory.ReadHalf(translated_address);
                 break;
+            }
             
-            case Type::SB:
-                memory.WriteByte(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+            case Type::SB: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                if (!translation_valid) continue;
+                memory.WriteByte(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::SH:
-                memory.WriteHalf(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+            case Type::SH: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                if (!translation_valid) continue;
+                memory.WriteHalf(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::SW:
-                memory.WriteWord(regs[instr.rs1] + instr.immediate, regs[instr.rs2]);
+            case Type::SW: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                if (!translation_valid) continue;
+                memory.WriteWord(translated_address, regs[instr.rs2]);
                 break;
+            }
             
             case Type::ADDI:
                 regs[instr.rd] = regs[instr.rs1] + instr.immediate;
@@ -1102,69 +1192,120 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             }
             
-            case Type::LR_W:
+            case Type::LR_W: {
                 if (instr.rs2 != 0) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
                     continue;
                 }
-                regs[instr.rd] = memory.ReadWordReserved(regs[instr.rs1], csrs[CSR_MHARTID]);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.ReadWordReserved(translated_address, csrs[CSR_MHARTID]);
                 break;
+            }
             
-            case Type::SC_W:
-                if (memory.WriteWordConditional(regs[instr.rs1], regs[instr.rs2], csrs[CSR_MHARTID]))
+            case Type::SC_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], true, false);
+                if (!translation_valid) continue;
+                
+                if (memory.WriteWordConditional(translated_address, regs[instr.rs2], csrs[CSR_MHARTID]))
                     regs[instr.rd] = 0;
                 
                 else
                     regs[instr.rd] = 1;
                 
                 break;
+            }
             
-            case Type::AMOSWAP_W:
-                regs[instr.rd] = memory.AtomicSwap(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOSWAP_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.AtomicSwap(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::AMOADD_W:
-                regs[instr.rd] = memory.AtomicAdd(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOADD_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.AtomicAdd(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::AMOXOR_W:
-                regs[instr.rd] = memory.AtomicXor(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOXOR_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.AtomicXor(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::AMOAND_W:
-                regs[instr.rd] = memory.AtomicAnd(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOAND_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.AtomicAnd(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::AMOOR_W:
-                regs[instr.rd] = memory.AtomicOr(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOOR_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+                
+                regs[instr.rd] = memory.AtomicOr(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::AMOMIN_W:
-                regs[instr.rd] = memory.AtomicMin(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOMIN_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.AtomicMin(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::AMOMAX_W:
-                regs[instr.rd] = memory.AtomicMax(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOMAX_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.AtomicMax(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::AMOMINU_W:
-                regs[instr.rd] = memory.AtomicMinU(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOMINU_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.AtomicMinU(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::AMOMAXU_W:
-                regs[instr.rd] = memory.AtomicMaxU(regs[instr.rs1], regs[instr.rs2]);
+            case Type::AMOMAXU_W: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                if (!translation_valid) continue;
+
+                regs[instr.rd] = memory.AtomicMaxU(translated_address, regs[instr.rs2]);
                 break;
+            }
             
-            case Type::FLW:
+            case Type::FLW: {
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
 
-                fregs[instr.rd] = ToFloat(memory.ReadWord(regs[instr.rs1] + instr.immediate));
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                if (!translation_valid) continue;
+
+                fregs[instr.rd] = ToFloat(translated_address);
                 break;
+            }
             
-            case Type::FSW:
-                memory.WriteWord(regs[instr.rs1] + instr.immediate, ToUInt32(fregs[instr.rs2]));
+            case Type::FSW: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                if (!translation_valid) continue;
+                memory.WriteWord(translated_address, ToUInt32(fregs[instr.rs2]));
                 break;
+            }
             
             case Type::FMADD_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
@@ -1700,18 +1841,22 @@ bool VirtualMachine::Step(uint32_t steps) {
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
 
-                auto addr = regs[instr.rs1] + instr.immediate;
-                uint64_t val = memory.ReadWord(addr);
-                val |= static_cast<uint64_t>(memory.ReadWord(addr + 4)) << 32;
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                if (!translation_valid) continue;
+
+                uint64_t val = memory.ReadWord(translated_address);
+                val |= static_cast<uint64_t>(memory.ReadWord(translated_address + 4)) << 32;
                 fregs[instr.rd] = ToDouble(val);
                 break;
             }
             
             case Type::FSD: {
-                auto addr = regs[instr.rs1] + instr.immediate;
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                if (!translation_valid) continue;
+                
                 auto val = ToUInt64(fregs[instr.rs2]);
-                memory.WriteWord(addr, static_cast<uint32_t>(val));
-                memory.WriteWord(addr + 4, static_cast<uint32_t>(val >> 32));
+                memory.WriteWord(translated_address, static_cast<uint32_t>(val));
+                memory.WriteWord(translated_address + 4, static_cast<uint32_t>(val >> 32));
                 break;
             }
             
@@ -2341,9 +2486,11 @@ bool VirtualMachine::Step(uint32_t steps) {
                 throw std::runtime_error(std::format("Instruction not implemented {}", std::string(instr)));
                 break;
             
-            case Type::CUST_TVA:
-                regs[instr.rd] = TranslateMemoryAddress(regs[instr.rs1], false);
+            case Type::CUST_TVA: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false);
+                regs[instr.rd] = translated_address;
                 break;
+            }
             
             case Type::CUST_MTRAP:
                 pc += 4;

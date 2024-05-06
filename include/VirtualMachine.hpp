@@ -49,8 +49,6 @@ private:
     bool ChangeRoundingMode(uint8_t rm = 0xff);
     bool CheckFloatErrors();
 
-    static constexpr size_t TLB_CACHE_SIZE = 16;
-
 public:
     static constexpr uint16_t CSR_FFLAGS = 0x001;
     static constexpr uint16_t CSR_FRM = 0x002;
@@ -86,7 +84,7 @@ public:
     static constexpr uint16_t CSR_SCAUSE = 0x142;
     static constexpr uint16_t CSR_STVAL = 0x143;
     static constexpr uint16_t CSR_SIP = 0x144;
-    static constexpr uint16_t CSR_SATP = 0x145;
+    static constexpr uint16_t CSR_SATP = 0x180;
 
     static constexpr uint16_t CSR_MVENDORID = 0xf11;
     static constexpr uint16_t CSR_MARCHID = 0xf12;
@@ -353,13 +351,33 @@ private:
 
     void RaiseMachineTrap(uint32_t cause);
     void RaiseSupervisorTrap(uint32_t cause);
-
-    void RaiseTrap(uint32_t handler_address, uint32_t cause, PrivilegeLevel handler_privilege);
     
     MStatus mstatus;
     SStatus sstatus;
 
-    std::vector<TLBEntry> tlb_cache;
+    struct TLBCacheEntry {
+        uint32_t tag : 31;
+        uint32_t super : 1;
+        
+        TLBEntry tlb_entry;
+
+        TLBCacheEntry() : tag{0}, super{0} { tlb_entry.raw = 0; }
+    };
+
+    static constexpr size_t TLB_CACHE_SIZE = 16;
+    
+    inline static consteval auto GetLog2(auto value) {
+        auto i = 0;
+        while ((1ULL << i) < value) i++;
+        return i;
+    }
+
+public:
+    std::pair<TLBEntry, bool> GetTLBLookup(uint32_t phys_addr, bool bypass_cache = false, bool is_amo = false);
+
+private:
+    size_t tlb_cache_round_robin = 0;
+    std::array<TLBCacheEntry, TLB_CACHE_SIZE> tlb_cache;
 
     Memory& memory;
 
@@ -400,22 +418,7 @@ public:
     }
 
 private:
-    uint32_t TranslateMemoryAddress(uint32_t address, bool is_write);
-
-    struct MemoryAccess {
-        uint32_t m_read : 1;
-        uint32_t m_write : 1;
-        uint32_t m_execute : 1;
-        uint32_t s_read : 1;
-        uint32_t s_write : 1;
-        uint32_t s_execute : 1;
-        uint32_t u_read : 1;
-        uint32_t u_write : 1;
-        uint32_t u_execute : 1;
-        uint32_t address_present : 1;
-        uint32_t translated_address;
-    };
-    MemoryAccess CheckMemoryAccess(uint32_t address) const;
+    std::pair<uint32_t, bool> TranslateMemoryAddress(uint32_t address, bool is_write, bool is_execute, bool is_amo = false);
 
     uint32_t pc;
     uint64_t cycles;
@@ -514,8 +517,6 @@ public:
     inline uint32_t GetSP() const {
         return regs[REG_SP];
     }
-
-    TLBEntry GetTLBLookup(uint32_t phys_addr, bool bypass_cache = false);
 
     size_t GetInstructionsPerSecond();
 
