@@ -367,6 +367,12 @@ private:
 
     SATP satp;
 
+public:
+    inline bool IsUsingVirtualMemory() const {
+        return (privilege_level != PrivilegeLevel::Machine) && (satp.MODE != 0);
+    }
+
+private:
     uint32_t TranslateMemoryAddress(uint32_t address, bool is_write);
 
     struct MemoryAccess {

@@ -357,8 +357,7 @@ uint32_t VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write)
 
     constexpr uint32_t PAGE_SIZE = 0x1000;
 
-    if (privilege_level == PrivilegeLevel::Machine) return address;
-    if (!satp.MODE) return address;
+    if (!IsUsingVirtualMemory()) return address;
 
     VirtualAddress vaddr;
     vaddr.raw = address;
