@@ -664,8 +664,13 @@ bool VirtualMachine::Step(uint32_t steps) {
     for (uint32_t i = 0; i < steps && running; i++) {
         cycles++;
 
-        if (waiting_for_interrupt)
-            continue;
+        if (waiting_for_interrupt) {
+            if (mip != 0 || sip != 0)
+                waiting_for_interrupt = false;
+            
+            else
+                continue;
+        }
 
         if (mstatus.MIE) {
             auto pending_interrupts = mip;
@@ -2399,11 +2404,10 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::BLT:
             case Type::BLTU:
             case Type::BNE:
-            case Type::WFI:
                 break;
             
             default:
-                    pc += 4;
+                pc += 4;
         }
         
         if (instr.rd == 0) regs[instr.rd] = 0;
