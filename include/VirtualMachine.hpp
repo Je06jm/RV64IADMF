@@ -315,7 +315,14 @@ public:
 
     void RaiseInterrupt(uint32_t cause);
 
+private:
     bool waiting_for_interrupt = false;
+
+public:
+    inline bool IsWaitingForInterrupt() const {
+        return waiting_for_interrupt;
+    }
+
 private:
     static constexpr uint32_t TRAP_INTERRUPT_BIT = (1ULL << 31);
 

@@ -53,7 +53,7 @@ void GUIHart::Draw() {
         else if (vm->IsPaused())
             ImGui::Text("Status: Paused");
         
-        else if (vm->waiting_for_interrupt)
+        else if (vm->IsWaitingForInterrupt())
             ImGui::Text("Status: Waiting for interrupt");
         
         else
