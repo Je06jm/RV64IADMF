@@ -32,14 +32,19 @@ void GUIHart::Draw() {
         auto ips = vm->GetInstructionsPerSecond();
         auto k_ips = ips / 1000.0f;
         auto m_ips = k_ips / 1000.0f;
+        auto b_ips = m_ips / 1000.0f;
 
-        if (k_ips < 1.0) {
+        if (k_ips < 1.0)
             ImGui::Text("IPS: %llu", ips);
-        } else if (m_ips < 1.0) {
+
+        else if (m_ips < 1.0)
             ImGui::Text("IPS: %.2fK", k_ips);
-        } else {
+        
+        else if (b_ips < 1.0)
             ImGui::Text("IPS: %.2fM", m_ips);
-        }
+        
+        else
+            ImGui::Text("IPS: %f.2B", b_ips);
 
         ImGui::NewLine();
 
