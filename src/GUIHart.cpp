@@ -34,11 +34,11 @@ void GUIHart::Draw() {
         auto m_ips = k_ips / 1000.0f;
 
         if (k_ips < 1.0) {
-            ImGui::Text("IPC: %llu", ips);
+            ImGui::Text("IPS: %llu", ips);
         } else if (m_ips < 1.0) {
-            ImGui::Text("IPC: %.2fK", k_ips);
+            ImGui::Text("IPS: %.2fK", k_ips);
         } else {
-            ImGui::Text("IPC: %.2fM", m_ips);
+            ImGui::Text("IPS: %.2fM", m_ips);
         }
 
         ImGui::NewLine();

@@ -684,8 +684,6 @@ bool VirtualMachine::Step(uint32_t steps) {
             bool handled = false;
 
             if (pending_interrupts) {
-                auto handler_address = csrs[CSR_MTVEC];
-
                 for (uint32_t cause = 31; cause > 32; cause--) {
                     if (pending_interrupts & (1ULL << cause)) {
                         RaiseMachineTrap(cause | TRAP_INTERRUPT_BIT);
@@ -700,8 +698,6 @@ bool VirtualMachine::Step(uint32_t steps) {
                 pending_interrupts &= sie;
 
                 if (pending_interrupts) {
-                    auto handler_address = csrs[CSR_STVEC];
-
                     for (uint32_t cause = 31; cause > 32; cause--) {
                         if (pending_interrupts & (1ULL << cause)) {
                             RaiseSupervisorTrap(cause | TRAP_INTERRUPT_BIT);
