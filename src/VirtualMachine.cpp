@@ -785,6 +785,8 @@ bool VirtualMachine::Step(uint32_t steps) {
         
         auto instr = RVInstruction::FromUInt32(memory.ReadWord(translated_address));
 
+        bool inc_pc = true;
+
         switch (instr.type) {
             case Type::LUI:
                 regs[instr.rd] = instr.immediate;
@@ -1035,17 +1037,21 @@ bool VirtualMachine::Step(uint32_t steps) {
                     
                     case PrivilegeLevel::Supervisor:
                         RaiseException(EXCEPTION_ENVIRONMENT_CALL_FROM_S_MODE);
+                        inc_pc = false;
                         break;
                     
                     case PrivilegeLevel::User:
                         RaiseException(EXCEPTION_ENVIRONMENT_CALL_FROM_U_MODE);
+                        inc_pc = false;
                         break;
                 }
                 break;
             
             case Type::EBREAK:
-                if (privilege_level == PrivilegeLevel::User)
+                if (privilege_level == PrivilegeLevel::User) {
                     RaiseException(EXCEPTION_BREAKPOINT);
+                    inc_pc = false;
+                }
                 
                 break;
             
@@ -1195,7 +1201,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::LR_W: {
                 if (instr.rs2 != 0) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false);
                 if (!translation_valid) continue;
@@ -1310,7 +1317,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FMADD_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1322,7 +1330,8 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 if (lhs_is_inf && rhs_is_zero) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 float result = fregs[instr.rs1].f * fregs[instr.rs2].f + fregs[instr.rs3].f;
@@ -1339,7 +1348,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FMSUB_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1351,7 +1361,8 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 if (lhs_is_inf && rhs_is_zero) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 float result = fregs[instr.rs1].f * fregs[instr.rs2].f - fregs[instr.rs3].f;
@@ -1368,7 +1379,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FNMSUB_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1380,7 +1392,8 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 if (lhs_is_inf && rhs_is_zero) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 float result = -(fregs[instr.rs1].f * fregs[instr.rs2].f) + fregs[instr.rs3].f;
@@ -1397,7 +1410,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FNMADD_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1409,7 +1423,8 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 if (lhs_is_inf && rhs_is_zero) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 float result = -(fregs[instr.rs1].f * fregs[instr.rs2].f) - fregs[instr.rs3].f;
@@ -1426,7 +1441,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FADD_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1445,7 +1461,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FSUB_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1464,7 +1481,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FMUL_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1483,7 +1501,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FDIV_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1502,7 +1521,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FSQRT_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1642,7 +1662,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FCVT_W_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 bool is_inf, is_nan, is_qnan;
@@ -1674,7 +1695,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FCVT_WU_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 bool is_inf, is_nan, is_qnan;
@@ -1710,7 +1732,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FEQ_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 auto lhs = fregs[instr.rs1];
@@ -1736,7 +1759,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FLT_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 auto lhs = fregs[instr.rs1];
@@ -1760,7 +1784,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FLE_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 auto lhs = fregs[instr.rs1];
@@ -1784,7 +1809,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FCLASS_S: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 bool is_inf, is_nan, is_qnan, is_subnormal, is_zero, is_neg;
@@ -1863,7 +1889,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FMADD_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1875,7 +1902,8 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 if (lhs_is_inf && rhs_is_zero) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 double result = fregs[instr.rs1].d * fregs[instr.rs2].d + fregs[instr.rs3].d;
@@ -1892,7 +1920,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FMSUB_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1904,7 +1933,8 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 if (lhs_is_inf && rhs_is_zero) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 double result = fregs[instr.rs1].d * fregs[instr.rs2].d - fregs[instr.rs3].d;
@@ -1921,7 +1951,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FNMSUB_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1933,7 +1964,8 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 if (lhs_is_inf && rhs_is_zero) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 double result = -(fregs[instr.rs1].d * fregs[instr.rs2].d) + fregs[instr.rs3].d;
@@ -1950,7 +1982,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FNMADD_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1962,7 +1995,8 @@ bool VirtualMachine::Step(uint32_t steps) {
 
                 if (lhs_is_inf && rhs_is_zero) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 double result = -(fregs[instr.rs1].d * fregs[instr.rs2].d) - fregs[instr.rs3].d;
@@ -1979,7 +2013,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FADD_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -1998,7 +2033,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FSUB_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -2017,7 +2053,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FMUL_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -2036,7 +2073,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FDIV_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -2055,7 +2093,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FSQRT_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -2195,7 +2234,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FCVT_S_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
@@ -2231,7 +2271,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FEQ_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 auto lhs = fregs[instr.rs1];
@@ -2257,7 +2298,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FLT_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 auto lhs = fregs[instr.rs1];
@@ -2281,7 +2323,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FLE_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 auto lhs = fregs[instr.rs1];
@@ -2305,7 +2348,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FCLASS_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 bool is_inf, is_nan, is_qnan, is_subnormal, is_zero, is_neg;
@@ -2330,7 +2374,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FCVT_W_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 bool is_inf, is_nan, is_qnan;
@@ -2362,7 +2407,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::FCVT_WU_D: {
                 if (!ChangeRoundingMode(instr.rm)) {
                     RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                    continue;
+                    inc_pc = false;
+                    break;
                 }
 
                 bool is_inf, is_nan, is_qnan;
@@ -2535,7 +2581,8 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::INVALID:
             default:
                 RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
-                continue;
+                inc_pc = false;
+                break;
         }
 
         switch (instr.type) {
@@ -2550,7 +2597,8 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             default:
-                pc += 4;
+                if (inc_pc)
+                    pc += 4;
         }
         
         if (instr.rd == 0) regs[instr.rd] = 0;
