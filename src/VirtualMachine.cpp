@@ -732,9 +732,12 @@ bool VirtualMachine::Step(uint32_t steps) {
         cycles++;
 
         if (waiting_for_interrupt) {
-            if (mip != 0 || sip != 0)
+            if (mip != 0 || sip != 0 || (mie & ~mideleg) == 0)
                 waiting_for_interrupt = false;
-            
+
+            if ((mie & mideleg) != 0 && (sie & mideleg) == 0)
+                waiting_for_interrupt = false;
+
             else
                 continue;
         }
