@@ -3,14 +3,14 @@
 
 #include <cstdint>
 
-using Address = uint32_t;
+using Address = uint64_t;
 
 using Long = uint64_t;
 using Word = uint32_t;
 using Half = uint16_t;
 using Byte = uint8_t;
 
-using SAddress = int32_t;
+using SAddress = int64_t;
 
 using SLong = int64_t;
 using SWord = int32_t;
