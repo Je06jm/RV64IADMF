@@ -1,4 +1,4 @@
-#include "RV32I.hpp"
+#include "RV64.hpp"
 
 #include <format>
 
@@ -343,6 +343,38 @@ RVInstruction::operator std::string() {
             s = std::format("EBREAK");
             break;
         
+        case Type::LWU:
+            s = std::format("LWU {}, {}({})", s_rd, imm.s, s_rs1);
+            break;
+        
+        case Type::LD:
+            s = std::format("LD {}, {}({})", s_rd, imm.s, s_rs1);
+            break;
+        
+        case Type::SD:
+            s = std::format("SD {}, {}({})", s_rs2, imm.s, s_rs1);
+            break;
+
+        case Type::ADDIW:
+            s = std::format("ADDI.W {}, {}, {}", s_rd, s_rs1, s_imm);
+            break;
+        
+        case Type::SUBW:
+            s = std::format("SUB.W {}, {}, {}", s_rd, s_rs1, s_imm);
+            break;
+        
+        case Type::SLLW:
+            s = std::format("SLL.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+        
+        case Type::SRLW:
+            s = std::format("SRL.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+        
+        case Type::SRAW:
+            s = std::format("SRA.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+
         case Type::CSRRW:
             s = std::format("CSRRW {}, {}, {}", s_rd, s_rs1, s_rs2);
             break;
@@ -399,6 +431,26 @@ RVInstruction::operator std::string() {
             s = std::format("REMU {}, {}, {}", s_rd, s_rs1, s_rs2);
             break;
         
+        case Type::MULW:
+            s = std::format("MUL.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+        
+        case Type::DIVW:
+            s = std::format("DIV.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+        
+        case Type::DIVUW:
+            s = std::format("DIVU.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+        
+        case Type::REMW:
+            s = std::format("REM.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+        
+        case Type::REMUW:
+            s = std::format("REMU.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+        
         case Type::LR_W:
             s = std::format("LR.W {}, {}", s_rd, s_rs1);
             break;
@@ -441,6 +493,10 @@ RVInstruction::operator std::string() {
         
         case Type::AMOMAXU_W:
             s = std::format("AMOMAXU.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
+        
+        case Type::LR_D:
+            s = std::format("LR.D");
             break;
         
         case Type::FLW:
@@ -727,13 +783,16 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
     static constexpr Byte FUNCT3_LB = 0b000;
     static constexpr Byte FUNCT3_LH = 0b001;
     static constexpr Byte FUNCT3_LW = 0b010;
+    static constexpr Byte FUNCT3_LD = 0b011;
     static constexpr Byte FUNCT3_LBU = 0b100;
     static constexpr Byte FUNCT3_LHU = 0b101;
+    static constexpr Byte FUNCT3_LWU = 0b110;
 
     static constexpr Byte OP_STORE = 0b0100011;
     static constexpr Byte FUNCT3_SB = 0b000;
     static constexpr Byte FUNCT3_SH = 0b001;
     static constexpr Byte FUNCT3_SW = 0b010;
+    static constexpr Byte FUNCT3_SD = 0b011;
 
     static constexpr Byte OP_MATH_IMMEDIATE = 0b0010011;
     static constexpr Byte FUNCT3_ADDI = 0b000;
@@ -743,14 +802,17 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
     static constexpr Byte FUNCT3_ORI = 0b110;
     static constexpr Byte FUNCT3_ANDI = 0b111;
 
+    static constexpr Byte OP_MATH_W_IMMEDIATE = 0b0011011;
+
     static constexpr Byte FUNCT3_SLLI = 0b001;
     static constexpr Byte FUNCT7_SLLI = 0b0;
 
     static constexpr Byte FUNCT3_SHIFT_RIGHT_IMMEDIATE = 0b101;
     static constexpr Byte FUNCT7_SRLI = 0b0;
-    static constexpr Byte FUNCT7_SRAI = 0b0100000;
+    static constexpr Byte FUNCT7_SRAI = 0b010000;
 
     static constexpr Byte OP_MATH = 0b0110011;
+    static constexpr Byte OP_MATH_W = 0b0111011;
 
     static constexpr Byte FUNCT3_ADD_SUB_MUL = 0b000;
     static constexpr Byte FUNCT7_ADD = 0b0;
@@ -788,6 +850,7 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
 
     static constexpr Byte OP_ATOMIC = 0b0101111;
     static constexpr Byte FUNCT3_ATOMIC = 0b010;
+    static constexpr Byte FUNCT3_ATOMIC_W = 0b011;
     static constexpr Byte FUNCT7_ATOMIC_MASK = 0b1111100;
 
     static constexpr Byte FUNCT7_LR_W = 0b0001000;
@@ -860,6 +923,8 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
     static constexpr Byte FUNCT5_FCVT = 0b11010;
     static constexpr Byte RS2_FCVT_W = 0b00000;
     static constexpr Byte RS2_FCVT_WU = 0b00001;
+    static constexpr Byte RS2_FCVT_L = 0b0010;
+    static constexpr Byte RS2_FCVT_LU = 0b0011;
 
     static constexpr Byte FUNCT3_FMV_X_W = 0b000;
     static constexpr Byte RS2_FMV_X_W = 0b00000;
@@ -1092,12 +1157,20 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
                     rv.type = RVInstruction::Type::LW;
                     break;
                 
+                case FUNCT3_LD:
+                    rv.type = RVInstruction::Type::LD;
+                    break;
+                
                 case FUNCT3_LBU:
                     rv.type = RVInstruction::Type::LBU;
                     break;
                 
                 case FUNCT3_LHU:
                     rv.type = RVInstruction::Type::LHU;
+                    break;
+                
+                case FUNCT3_LWU:
+                    rv.type = RVInstruction::Type::LWU;
                     break;
                 
                 default:
@@ -1123,6 +1196,10 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
                 
                 case FUNCT3_SW:
                     rv.type = RVInstruction::Type::SW;
+                    break;
+                
+                case FUNCT3_SD:
+                    rv.type = RVInstruction::Type::SD;
                     break;
                 
                 default:
@@ -1162,14 +1239,13 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
                     break;
                 
                 case FUNCT3_SLLI:
-                    if ((rv.immediate >> 5) != 0) break;
+                    if ((rv.immediate >> 6) != 0) break;
                     rv.type = RVInstruction::Type::SLLI;
-                    rv.rs2 = iw.R.rs2;
                     break;
                 
                 case FUNCT3_SHIFT_RIGHT_IMMEDIATE:
                     rv.rs2 = iw.R.rs2;
-                    switch (rv.immediate >> 5) {
+                    switch (rv.immediate >> 6) {
                         case FUNCT7_SRLI:
                             rv.type = RVInstruction::Type::SRLI;
                             break;
@@ -1188,6 +1264,38 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
             }
             break;
         
+        case OP_MATH_W_IMMEDIATE:
+            rv.rd = iw.I.rd;
+            rv.rs1 = iw.I.rs1;
+            rv.immediate = iw.I.imm;
+            sign_extend_at = 11;
+
+            switch (iw.I.funct3) {
+                case FUNCT3_ADDI:
+                    rv.type = RVInstruction::Type::ADDIW;
+                    break;
+                
+                case FUNCT3_SLLI:
+                    if ((rv.immediate >> 5) != 0) break;
+                    rv.type = RVInstruction::Type::SLLIW;
+                    break;
+                
+                case FUNCT3_SHIFT_RIGHT_IMMEDIATE:
+                    switch (rv.immediate >> 5) {
+                        case FUNCT7_SRLI:
+                            rv.type = RVInstruction::Type::SRLIW;
+                            break;
+                        
+                        case FUNCT7_SRAI:
+                            rv.type = RVInstruction::Type::SRAIW;
+                            break;
+                        
+                        default:
+                            break;
+                    }
+                    break;
+            }
+
         case OP_MATH:
             rv.rd = iw.R.rd;
             rv.rs1 = iw.R.rs1;
@@ -1326,6 +1434,79 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
             }
             break;
         
+        case OP_MATH_W:
+            rv.rd = iw.R.rd;
+            rv.rs1 = iw.R.rs1;
+            rv.rs2 = iw.R.rs2;
+
+            switch (iw.R.funct3) {
+                case FUNCT3_ADD_SUB_MUL:
+                    switch (iw.R.funct7) {
+                        case FUNCT7_ADD:
+                            rv.type = RVInstruction::Type::ADDW;
+                            break;
+                        
+                        case FUNCT7_SUB:
+                            rv.type = RVInstruction::Type::SUBW;
+                            break;
+                        
+                        case FUNCT7_MUL:
+                            rv.type = RVInstruction::Type::MULW;
+                            break;
+                        
+                        default:
+                            break;
+                    }
+                    break;
+                
+                case FUNCT3_SLL_MULH:
+                    if (iw.R.funct7 != FUNCT7_SLL) break;
+                    rv.type = RVInstruction::Type::SLLW;
+                    break;
+                
+                case FUNCT3_SLT_MULHSU:
+                    break;
+                
+                case FUNCT3_SLTU_MULHU:
+                    if (iw.R.funct7 != FUNCT7_SLTU) break;
+                    rv.type = RVInstruction::Type::SLTU;
+                    break;
+                
+                case FUNCT3_XOR_DIV:
+                    if (iw.R.funct7 != FUNCT7_DIV) break;
+                    rv.type = RVInstruction::Type::DIVW;
+                    break;
+                
+                case FUNCT3_SHIFT_RIGHT_DIVU:
+                    switch (iw.R.funct7) {
+                        case FUNCT7_SRL:
+                            rv.type = RVInstruction::Type::SRLW;
+                            break;
+                        
+                        case FUNCT7_SRA:
+                            rv.type = RVInstruction::Type::SRAW;
+                            break;
+                        
+                        case FUNCT7_DIVU:
+                            rv.type = RVInstruction::Type::DIVUW;
+                            break;
+                        
+                        default:
+                            break;
+                    }
+                    break;
+                
+                case FUNCT3_OR_REM:
+                    if (iw.R.funct7 != FUNCT7_REM) break;
+                    rv.type = RVInstruction::Type::REMW;
+                    break;
+                
+                case FUNCT3_AND_REMU:
+                    if (iw.R.funct7 != FUNCT7_REMU) break;
+                    rv.type = RVInstruction::Type::REMUW;
+                    break;
+            }
+
         case OP_FENCE:
             if (iw.I.funct3 != FUNCT3_FENCE) break;
 
@@ -1451,82 +1632,62 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
             break;
 
         case OP_ATOMIC:
-            if (iw.R.funct3 != FUNCT3_ATOMIC) break;
-
             rv.rd = iw.R.rd;
             rv.rs1 = iw.R.rs1;
             rv.rs2 = iw.R.rs2;
 
-            switch (iw.R.funct7 & FUNCT7_ATOMIC_MASK) {
-                case FUNCT7_LR_W:
-                    if (iw.R.rs2 != RS2_LR_W) break;
+            switch (iw.R.funct3) {
+                case FUNCT3_ATOMIC:
+                    switch (iw.R.funct7 & FUNCT7_ATOMIC_MASK) {
+                        case FUNCT7_LR_W:
+                            if (iw.R.rs2 != RS2_LR_W) break;
 
-                    rv.type = RVInstruction::Type::LR_W;
-                    break;
-                
-                case FUNCT7_SC_W:
-                    rv.type = RVInstruction::Type::SC_W;
-                    break;
-                
-                case FUNCT7_AMOSWAP_W:
-                    rv.type = RVInstruction::Type::AMOSWAP_W;
-                    break;
-                
-                case FUNCT7_AMOADD_W:
-                    rv.type = RVInstruction::Type::AMOADD_W;
-                    break;
-                
-                case FUNCT7_AMOXOR_W:
-                    rv.type = RVInstruction::Type::AMOXOR_W;
-                    break;
-                
-                case FUNCT7_AMOAND_W:
-                    rv.type = RVInstruction::Type::AMOAND_W;
-                    break;
-                
-                case FUNCT7_AMOOR_W:
-                    rv.type = RVInstruction::Type::AMOOR_W;
-                    break;
-                
-                case FUNCT7_AMOMIN_W:
-                    rv.type = RVInstruction::Type::AMOMIN_W;
-                    break;
-                
-                case FUNCT7_AMOMAX_W:
-                    rv.type = RVInstruction::Type::AMOMAX_W;
-                    break;
-                
-                case FUNCT7_AMOMINU_W:
-                    rv.type = RVInstruction::Type::AMOMINU_W;
-                    break;
-                
-                case FUNCT7_AMOMAXU_W:
-                    rv.type = RVInstruction::Type::AMOMAXU_W;
-                    break;
-                
-                default:
-                    break;
-            }
-
-            switch (iw.R.funct7 & FUNCT7_ATOMIC_MASK) {
-                case FUNCT7_SC_W:
-                    break;
-
-                case FUNCT7_AMOSWAP_W:
-                case FUNCT7_AMOADD_W:
-                case FUNCT7_AMOXOR_W:
-                case FUNCT7_AMOAND_W:
-                case FUNCT7_AMOOR_W:
-                case FUNCT7_AMOMIN_W:
-                case FUNCT7_AMOMAX_W:
-                case FUNCT7_AMOMINU_W:
-                case FUNCT7_AMOMAXU_W:
-                    rv.rd = iw.R.rd;
-                    rv.rs1 = iw.R.rs1;
-                    rv.rs2 = iw.R.rs2;
-                    break;
-                
-                default:
+                            rv.type = RVInstruction::Type::LR_W;
+                            break;
+                        
+                        case FUNCT7_SC_W:
+                            rv.type = RVInstruction::Type::SC_W;
+                            break;
+                        
+                        case FUNCT7_AMOSWAP_W:
+                            rv.type = RVInstruction::Type::AMOSWAP_W;
+                            break;
+                        
+                        case FUNCT7_AMOADD_W:
+                            rv.type = RVInstruction::Type::AMOADD_W;
+                            break;
+                        
+                        case FUNCT7_AMOXOR_W:
+                            rv.type = RVInstruction::Type::AMOXOR_W;
+                            break;
+                        
+                        case FUNCT7_AMOAND_W:
+                            rv.type = RVInstruction::Type::AMOAND_W;
+                            break;
+                        
+                        case FUNCT7_AMOOR_W:
+                            rv.type = RVInstruction::Type::AMOOR_W;
+                            break;
+                        
+                        case FUNCT7_AMOMIN_W:
+                            rv.type = RVInstruction::Type::AMOMIN_W;
+                            break;
+                        
+                        case FUNCT7_AMOMAX_W:
+                            rv.type = RVInstruction::Type::AMOMAX_W;
+                            break;
+                        
+                        case FUNCT7_AMOMINU_W:
+                            rv.type = RVInstruction::Type::AMOMINU_W;
+                            break;
+                        
+                        case FUNCT7_AMOMAXU_W:
+                            rv.type = RVInstruction::Type::AMOMAXU_W;
+                            break;
+                        
+                        default:
+                            break;
+                    }
                     break;
             }
             break;
@@ -1868,7 +2029,18 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
 
                 case FUNCT5_FCLASS_FMV_X_W:
                     if (iw.R.rs2 == RS2_FMV_X_W && iw.R.funct3 == FUNCT3_FMV_X_W) {
-                        rv.type = RVInstruction::Type::FMV_X_W;
+                        switch (iw.R.funct7 & FLOAT_FUNCT2_MASK) {
+                            case FUNCT2_S:
+                                rv.type = RVInstruction::Type::FMV_X_W;
+                                break;
+                            
+                            case FUNCT2_D:
+                                rv.type = RVInstruction::Type::FMV_X_D;
+                                break;
+                            
+                            default:
+                                break;
+                        }
                         break;
                     }
                     else if (iw.R.rs2 == RS2_FCLASS && iw.R.funct3 == FUNCT3_FCLASS) {
@@ -1972,6 +2144,36 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
                             }
                             break;
                         
+                        case RS2_FCVT_L:
+                            switch (iw.R.funct7 & FLOAT_FUNCT2_MASK) {
+                                case FUNCT2_S:
+                                    rv.type = RVInstruction::Type::FCVT_S_L;
+                                    break;
+                                
+                                case FUNCT2_D:
+                                    rv.type = RVInstruction::Type::FCVT_D_L;
+                                    break;
+                                
+                                default:
+                                    break;
+                            }
+                            break;
+                        
+                        case RS2_FCVT_LU:
+                            switch (iw.R.funct7 & FLOAT_FUNCT2_MASK) {
+                                case FUNCT2_S:
+                                    rv.type = RVInstruction::Type::FCVT_S_LU;
+                                    break;
+                                
+                                case FUNCT2_D:
+                                    rv.type = RVInstruction::Type::FCVT_D_LU;
+                                    break;
+                                
+                                default:
+                                    break;
+                            }
+                            break;
+                        
                         default:
                             break;
                     }
@@ -1985,11 +2187,11 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
                 case FUNCT5_FCVT_D:
                     switch (iw.R.funct7 & FLOAT_FUNCT2_MASK) {
                         case FUNCT2_S:
-                            rv.type = RVInstruction::Type::FCVT_S_D;
+                            rv.type = RVInstruction::Type::FCVT_L_S;
                             break;
                         
                         case FUNCT2_D:
-                            rv.type = RVInstruction::Type::FCVT_D_S;
+                            rv.type = RVInstruction::Type::FCVT_L_D;
                             break;
                         
                         default:

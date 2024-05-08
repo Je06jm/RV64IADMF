@@ -1,6 +1,6 @@
 #include "VirtualMachine.hpp"
 
-#include "RV32I.hpp"
+#include "RV64.hpp"
 
 #include <format>
 #include <cassert>
@@ -953,19 +953,19 @@ bool VirtualMachine::Step(Word steps) {
                 break;
             
             case Type::SLLI: {
-                auto amount = instr.rs2;
+                auto amount = instr.immediate & 0b111111;
                 regs[instr.rd] = regs[instr.rs1] << amount;
                 break;
             }
             
             case Type::SRLI: {
-                auto amount = instr.rs2;
+                auto amount = instr.immediate & 0b111111;
                 regs[instr.rd] = regs[instr.rs1] >> amount;
                 break;
             }
             
             case Type::SRAI: {
-                auto amount = instr.rs2;
+                auto amount = instr.immediate & 0b111111;
                 auto value = regs[instr.rs1] >> amount;
                 Word sign = -1U << amount;
 
@@ -983,7 +983,7 @@ bool VirtualMachine::Step(Word steps) {
                 break;
             
             case Type::SLL: {
-                auto amount = regs[instr.rs2] & 0x1f;
+                auto amount = regs[instr.rs2] & 0x3f;
                 regs[instr.rd] = regs[instr.rs1] << amount;
                 break;
             }
@@ -1001,13 +1001,13 @@ bool VirtualMachine::Step(Word steps) {
                 break;
             
             case Type::SRL: {
-                auto amount = regs[instr.rs2] & 0x1f;
+                auto amount = regs[instr.rs2] & 0x3f;
                 regs[instr.rd] = regs[instr.rs1] >> amount;
                 break;
             }
             
             case Type::SRA: {
-                auto amount = regs[instr.rs2] & 0x1f;
+                auto amount = regs[instr.rs2] & 0x3f;
                 auto value = regs[instr.rs1] >> amount;
                 Word sign = -1U << amount;
 

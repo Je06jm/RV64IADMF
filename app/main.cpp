@@ -3,7 +3,7 @@
 #include "DeltaTime.hpp"
 
 #include <Memory.hpp>
-#include <RV32I.hpp>
+#include <RV64.hpp>
 
 #include "GUIMemoryViewer.hpp"
 #include "GUIAssembly.hpp"

@@ -3,7 +3,7 @@
 
 #include "VirtualMachine.hpp"
 #include "Memory.hpp"
-#include "RV32I.hpp"
+#include <RV64.hpp>
 
 #include <memory>
 
