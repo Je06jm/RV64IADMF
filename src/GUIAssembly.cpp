@@ -9,7 +9,7 @@
 
 void GUIAssembly::Draw() {
     if (ImGui::Begin("Assembly")) {
-        uint32_t pc = vm->GetPC();
+        Address pc = vm->GetPC();
 
         bool needs_scroll = pc != last_pc;
         last_pc = pc;
@@ -21,7 +21,7 @@ void GUIAssembly::Draw() {
         int64_t window_end = window_begin + WINDOW;
         int64_t window_end_pc = window_end << 2;
 
-        if (static_cast<uint32_t>(window_end_pc) >= memory.GetTotalMemory()) {
+        if (static_cast<Address>(window_end_pc) >= memory.GetTotalMemory()) {
             window_end = memory.GetTotalMemory() >> 2;
             window_end_pc = window_end << 2;
             window_begin = window_end - WINDOW;
@@ -31,11 +31,11 @@ void GUIAssembly::Draw() {
             throw std::runtime_error(std::format("Memory needs to be at least {} bytes in size", WINDOW << 2));
         }
 
-        uint32_t window_pc = static_cast<uint32_t>(window_begin) << 2;
+        Address window_pc = static_cast<Address>(window_begin) << 2;
 
         auto instrs = memory.PeekWords(window_pc, WINDOW);
 
-        for (uint32_t addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
+        for (Address addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
             if (instrs[i].second) {
                 RVInstruction instr = RVInstruction::FromUInt32(instrs[i].first);
                 if (addr == pc) {

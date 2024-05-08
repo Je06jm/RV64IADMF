@@ -6,13 +6,15 @@
 
 #include <vector>
 
-inline size_t framebuffer_width;
-inline size_t framebuffer_height;
-inline uint32_t framebuffer_address;
+#include <Types.hpp>
+
+inline Word framebuffer_width;
+inline Word framebuffer_height;
+inline Address framebuffer_address;
 
 class MemoryFramebuffer : public MemoryRegion {
 private:
-    std::vector<uint32_t> word_buffer;
+    std::vector<Word> word_buffer;
     GLuint texture;
     GLuint vao;
     GLuint vbo;
@@ -20,11 +22,11 @@ private:
 
     mutable std::mutex lock;
 
-    const size_t width, height;
+    const Word width, height;
 
-    MemoryFramebuffer(uint32_t base, uint32_t size, size_t width, size_t height);
+    MemoryFramebuffer(Address base, Address size, Word width, Word height);
 
-    inline uint32_t CorrectAddress(uint32_t address) const {
+    inline Address CorrectAddress(Address address) const {
         auto x = (address >> 2) % width;
         auto y = (address >> 2) / width;
 
@@ -34,11 +36,11 @@ private:
 public:
     ~MemoryFramebuffer();
 
-    uint32_t ReadWord(uint32_t address) const override {
+    Word ReadWord(Address address) const override {
         return word_buffer[CorrectAddress(address)];
     }
 
-    void WriteWord(uint32_t address, uint32_t word) override {
+    void WriteWord(Address address, Word word) override {
         word_buffer[CorrectAddress(address)] = word;
     }
 
@@ -52,7 +54,7 @@ public:
 
     void DrawBuffer() const;
 
-    static std::shared_ptr<MemoryFramebuffer> Create(uint32_t base, size_t width, size_t height);
+    static std::shared_ptr<MemoryFramebuffer> Create(Address base, Word width, Word height);
 };
 
 #endif

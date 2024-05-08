@@ -6,9 +6,9 @@
 
 void GUIRegs::Draw() {
     if (ImGui::Begin("Registers")) {
-        std::array<uint32_t, VirtualMachine::REGISTER_COUNT> regs;
+        std::array<Word, VirtualMachine::REGISTER_COUNT> regs;
         std::array<Float, VirtualMachine::REGISTER_COUNT> fregs;
-        uint32_t pc;
+        Word pc;
 
         vm->GetSnapshot(regs, fregs, pc);
 
@@ -87,17 +87,17 @@ void GUIRegs::Draw() {
         };
 
         for (size_t i = 0; i < VirtualMachine::REGISTER_COUNT; i++) {
-            ImGui::Text("%-10sx%-2u : 0x%08x (%i)", names[i].c_str(), static_cast<uint32_t>(i), regs[i], regs[i]);
+            ImGui::Text("%-10sx%-2u : 0x%08x (%i)", names[i].c_str(), static_cast<Word>(i), regs[i], regs[i]);
         }
 
         ImGui::Text(" ");
 
         for (size_t i = 0; i < VirtualMachine::REGISTER_COUNT; i++) {
             if (fregs[i].is_double)
-                ImGui::Text("%-10sf%-2u : 0x%016llx (%.8g)", fnames[i].c_str(), static_cast<uint32_t>(i), *reinterpret_cast<uint64_t*>(&fregs[i].d), fregs[i].d);
+                ImGui::Text("%-10sf%-2u : 0x%016llx (%.8g)", fnames[i].c_str(), static_cast<Word>(i), *reinterpret_cast<Address*>(&fregs[i].d), fregs[i].d);
 
             else
-                ImGui::Text("%-10sf%-2u : 0x%08x (%.8g)", fnames[i].c_str(), static_cast<uint32_t>(i), *reinterpret_cast<uint32_t*>(&fregs[i].f), fregs[i].f);
+                ImGui::Text("%-10sf%-2u : 0x%08x (%.8g)", fnames[i].c_str(), static_cast<Word>(i), *reinterpret_cast<Word*>(&fregs[i].f), fregs[i].f);
         }
     }
 

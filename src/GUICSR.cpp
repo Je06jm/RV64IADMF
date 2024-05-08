@@ -9,7 +9,7 @@
 #include <string>
 
 void GUICSR::Draw() {
-    using CSRTuple = std::tuple<uint32_t, std::string, bool>;
+    using CSRTuple = std::tuple<Word, std::string, bool>;
     using VM = VirtualMachine;
     
     static std::array csrs_names = {
@@ -62,7 +62,7 @@ void GUICSR::Draw() {
     };
 
     if (ImGui::Begin("CSRs")) {
-        std::unordered_map<uint32_t, uint32_t> csrs;
+        std::unordered_map<Word, Word> csrs;
         vm->GetCSRSnapshot(csrs);
 
         for (const auto& [csr, name, binary] : csrs_names) {

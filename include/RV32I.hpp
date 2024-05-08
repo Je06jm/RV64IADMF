@@ -5,6 +5,8 @@
 #include <string>
 #include <array>
 
+#include "Types.hpp"
+
 struct RVInstruction {
     enum class Type {
         LUI,
@@ -138,14 +140,14 @@ struct RVInstruction {
         CUST_STRAP
     };
 
-    static constexpr uint8_t RM_ROUND_TO_NEAREST_TIES_EVEN = 0b000;
-    static constexpr uint8_t RM_ROUND_TO_ZERO = 0b001;
-    static constexpr uint8_t RM_ROUND_DOWN = 0b010;
-    static constexpr uint8_t RM_ROUND_UP = 0b011;
-    static constexpr uint8_t RM_ROUND_TO_NEAREST_TIES_MAX_MAGNITUDE = 0b100;
-    static constexpr uint8_t RM_INVALID0 = 0b101;
-    static constexpr uint8_t RM_INVALID1 = 0b110;
-    static constexpr uint8_t RM_DYNAMIC = 0b111;
+    static constexpr Byte RM_ROUND_TO_NEAREST_TIES_EVEN = 0b000;
+    static constexpr Byte RM_ROUND_TO_ZERO = 0b001;
+    static constexpr Byte RM_ROUND_DOWN = 0b010;
+    static constexpr Byte RM_ROUND_UP = 0b011;
+    static constexpr Byte RM_ROUND_TO_NEAREST_TIES_MAX_MAGNITUDE = 0b100;
+    static constexpr Byte RM_INVALID0 = 0b101;
+    static constexpr Byte RM_INVALID1 = 0b110;
+    static constexpr Byte RM_DYNAMIC = 0b111;
 
     static std::array<std::string, 32> register_names;
     static std::array<std::string, 32> fregister_names;
@@ -154,15 +156,15 @@ struct RVInstruction {
 
     Type type = Type::INVALID;
 
-    uint32_t immediate;
-    uint8_t rd, rs1, rs2;
+    Word immediate;
+    Byte rd, rs1, rs2;
 
-    uint8_t rm;
-    uint8_t rs3;
+    Byte rm;
+    Byte rs3;
 
     operator std::string();
 
-    static RVInstruction FromUInt32(uint32_t instr);
+    static RVInstruction FromUInt32(Word instr);
 };
 
 #endif

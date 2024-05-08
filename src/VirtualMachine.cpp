@@ -18,7 +18,7 @@
 
 const int VirtualMachine::default_rounding_mode = fegetround();
 
-bool VirtualMachine::CSRPrivilegeCheck(uint32_t csr) {
+bool VirtualMachine::CSRPrivilegeCheck(Word csr) {
     if (csr < 4 || (csr >= 0xc00 && csr < 0xcf0))
         return true;
     
@@ -28,7 +28,7 @@ bool VirtualMachine::CSRPrivilegeCheck(uint32_t csr) {
     return privilege_level == PrivilegeLevel::Machine;
 }
 
-uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
+Word VirtualMachine::ReadCSR(Word csr, bool is_internal_read) {
     if (!is_internal_read && !CSRPrivilegeCheck(csr)) {
         RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
         return 0;
@@ -46,17 +46,17 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
     switch (csr) {
         case CSR_MCYCLE:
         case CSR_CYCLE:
-            return static_cast<uint32_t>(cycles);
+            return static_cast<Word>(cycles);
         
         case CSR_MCYCLEH:
         case CSR_CYCLEH:
-            return static_cast<uint32_t>(cycles >> 32);
+            return static_cast<Word>(cycles >> 32);
         
         case CSR_TIME:
-            return static_cast<uint32_t>(csr_mapped_memory->time);
+            return static_cast<Word>(csr_mapped_memory->time);
         
         case CSR_TIMEH:
-            return static_cast<uint32_t>(csr_mapped_memory->time >> 32);
+            return static_cast<Word>(csr_mapped_memory->time >> 32);
 
         case CSR_MSTATUS:
             mstatus.SD = mstatus.FS == FS_DIRTY;
@@ -107,7 +107,7 @@ uint32_t VirtualMachine::ReadCSR(uint32_t csr, bool is_internal_read) {
     return csrs[csr];
 }
 
-void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
+void VirtualMachine::WriteCSR(Word csr, Word value) {
     if (!CSRPrivilegeCheck(csr)) {
         RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
         return;
@@ -187,7 +187,7 @@ void VirtualMachine::WriteCSR(uint32_t csr, uint32_t value) {
     }
 }
 
-bool VirtualMachine::ChangeRoundingMode(uint8_t rm) {
+bool VirtualMachine::ChangeRoundingMode(Byte rm) {
     switch (rm) {
         case RVInstruction::RM_ROUND_TO_NEAREST_TIES_EVEN:
             fesetround(FE_TONEAREST);
@@ -237,7 +237,7 @@ bool VirtualMachine::CheckFloatErrors() {
     return false;
 }
 
-void VirtualMachine::RaiseInterrupt(uint32_t cause) {
+void VirtualMachine::RaiseInterrupt(Word cause) {
     auto cause_bit = 1ULL << cause;
 
     static std::mutex lock;
@@ -246,7 +246,7 @@ void VirtualMachine::RaiseInterrupt(uint32_t cause) {
     lock.unlock();
 }
 
-void VirtualMachine::RaiseException(uint32_t cause) {
+void VirtualMachine::RaiseException(Word cause) {
     auto cause_bit = 1ULL << cause;
 
     auto delegate = csrs[CSR_MEDELEG];
@@ -259,7 +259,7 @@ void VirtualMachine::RaiseException(uint32_t cause) {
     
 }
 
-void VirtualMachine::RaiseMachineTrap(uint32_t cause) {
+void VirtualMachine::RaiseMachineTrap(Word cause) {
     auto handler_address = csrs[CSR_MTVEC];
 
     auto mode = handler_address & 0b11;
@@ -303,7 +303,7 @@ void VirtualMachine::RaiseMachineTrap(uint32_t cause) {
     privilege_level = PrivilegeLevel::Machine;
 }
 
-void VirtualMachine::RaiseSupervisorTrap(uint32_t cause) {
+void VirtualMachine::RaiseSupervisorTrap(Word cause) {
     auto [handler_address, valid] = TranslateMemoryAddress(csrs[CSR_STVEC], false, false);
 
     if (!valid) return;
@@ -346,7 +346,7 @@ void VirtualMachine::RaiseSupervisorTrap(uint32_t cause) {
     privilege_level = PrivilegeLevel::Supervisor;
 }
 
-std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(uint32_t virt_addr, bool bypass_cache, bool is_amo) {
+std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(Word virt_addr, bool bypass_cache, bool is_amo) {
     constexpr auto KB_OFFSET_BITS = GetLog2(0x1000);
     constexpr auto MB_OFFSET_BITS = GetLog2(0x200000);
 
@@ -367,19 +367,19 @@ std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(uint32_t 
 
     union VirtualAddress {
         struct {
-            uint32_t offset : 12;
-            uint32_t vpn_0 : 10;
-            uint32_t vpn_1 : 10;
+            Word offset : 12;
+            Word vpn_0 : 10;
+            Word vpn_1 : 10;
         };
-        uint32_t raw;
+        Word raw;
     };
 
     VirtualAddress vaddr;
     vaddr.raw = virt_addr;
 
-    uint32_t root_table_address = satp.PPN << 12;
+    Word root_table_address = satp.PPN << 12;
 
-    auto ReadTLBEntry = [&](uint32_t address) {
+    auto ReadTLBEntry = [&](Address address) {
         TLBEntry ppn;
         ppn.V = 0;
         auto ppn_read = memory.PeekWord(address);
@@ -420,7 +420,7 @@ std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(uint32_t 
     if (!tlb.V) return {tlb, false};
 
     if (!tlb.R && !tlb.X) {
-        constexpr uint32_t PAGE_SIZE = 0x1000;
+        constexpr Word PAGE_SIZE = 0x1000;
         tlb = ReadTLBEntry(tlb.PPN * PAGE_SIZE + vaddr.vpn_0 * 4);
 
         cache.tag = kb_tag;
@@ -441,7 +441,7 @@ std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(uint32_t 
     return {tlb, cache.super != 0};
 }
 
-std::pair<uint32_t, bool> VirtualMachine::TranslateMemoryAddress(uint32_t address, bool is_write, bool is_execute, bool is_amo) {
+std::pair<Address, bool> VirtualMachine::TranslateMemoryAddress(Address address, bool is_write, bool is_execute, bool is_amo) {
     if (!IsUsingVirtualMemory()) return {address, true};
     
     auto [tlb, super] = GetTLBLookup(address);
@@ -484,17 +484,17 @@ std::pair<uint32_t, bool> VirtualMachine::TranslateMemoryAddress(uint32_t addres
 
     union VirtualAddress {
         struct {
-            uint32_t offset : 12;
-            uint32_t vpn_0 : 10;
-            uint32_t vpn_1 : 10;
+            Word offset : 12;
+            Word vpn_0 : 10;
+            Word vpn_1 : 10;
         };
-        uint32_t raw;
+        Word raw;
     };
 
     VirtualAddress vaddr;
     vaddr.raw = address;
 
-    uint32_t phys_address;
+    Word phys_address;
     if (super) {
         phys_address = tlb.PPN_1 << 22;
         phys_address |= vaddr.vpn_0 << 12;
@@ -559,7 +559,7 @@ void VirtualMachine::Setup() {
     cycles = 0;
 }
 
-VirtualMachine::VirtualMachine(Memory& memory, uint32_t starting_pc, uint32_t hart_id) : memory{memory}, pc{starting_pc} {
+VirtualMachine::VirtualMachine(Memory& memory, Word starting_pc, Word hart_id) : memory{memory}, pc{starting_pc} {
     csrs[CSR_MVENDORID] = 0;
 
     csrs[CSR_MARCHID] = ('E' << 24) | ('N' << 16) | ('I' << 8) | ('H');
@@ -605,17 +605,17 @@ VirtualMachine::~VirtualMachine() {
     running = false;
 }
 
-bool VirtualMachine::Step(uint32_t steps) {
-    auto SignExtend = [](uint32_t value, uint32_t bit) {
-        uint32_t sign = -1U << bit;
+bool VirtualMachine::Step(Word steps) {
+    auto SignExtend = [](Word value, Word bit) {
+        Word sign = -1U << bit;
         if (value & (1U << bit)) return value | sign;
         return value;
     };
 
-    auto AsSigned = [](uint32_t value) {
+    auto AsSigned = [](Word value) {
         union S32U32 {
-            uint32_t u;
-            int32_t s;
+            Word u;
+            SWord s;
         };
 
         S32U32 v;
@@ -623,10 +623,10 @@ bool VirtualMachine::Step(uint32_t steps) {
         return v.s;
     };
 
-    auto AsUnsigned = [](int32_t value) {
+    auto AsUnsigned = [](SWord value) {
         union S32U32 {
-            uint32_t u;
-            int32_t s;
+            Word u;
+            SWord s;
         };
 
         S32U32 v;
@@ -634,10 +634,10 @@ bool VirtualMachine::Step(uint32_t steps) {
         return v.u;
     };
 
-    auto ToFloat = [](uint32_t value) {
+    auto ToFloat = [](Word value) {
         union F32U32 {
             float f;
-            uint32_t u;
+            Word u;
         };
 
         F32U32 v;
@@ -648,10 +648,10 @@ bool VirtualMachine::Step(uint32_t steps) {
         return f;
     };
 
-    auto ToDouble = [](uint64_t value) {
+    auto ToDouble = [](Long value) {
         union F64U64 {
             double d;
-            uint64_t u;
+            Long u;
         };
 
         F64U64 v;
@@ -664,7 +664,7 @@ bool VirtualMachine::Step(uint32_t steps) {
     auto ToUInt32 = [](Float value) {
         union F32U32 {
             float f;
-            uint32_t u;
+            Word u;
         };
 
         F32U32 v;
@@ -675,7 +675,7 @@ bool VirtualMachine::Step(uint32_t steps) {
     auto ToUInt64 = [](Float value) {
         union F64U64 {
             double d;
-            uint64_t u;
+            Long u;
         };
 
         F64U64 v;
@@ -685,9 +685,9 @@ bool VirtualMachine::Step(uint32_t steps) {
 
     auto ClassF32 = [](Float value, bool* is_inf, bool* is_nan, bool* is_qnan, bool* is_subnormal, bool* is_zero, bool* is_neg) {
         // TODO This might not work as intended
-        uint8_t sign = value.u32 >> 31;
-        uint8_t exp = (value.u32 >> 23) & 0xff;
-        uint32_t frac = value.u32 & 0x7fffff;
+        Byte sign = value.u32 >> 31;
+        Byte exp = (value.u32 >> 23) & 0xff;
+        Word frac = value.u32 & 0x7fffff;
         
         if (is_inf) *is_inf = exp == 0xff && frac == 0;
         if (is_nan) *is_nan = exp == 0xff && frac != 0 && !(frac & 0x400000);
@@ -699,9 +699,9 @@ bool VirtualMachine::Step(uint32_t steps) {
 
     auto ClassF64 = [](Float value, bool* is_inf, bool* is_nan, bool* is_qnan, bool* is_subnormal, bool* is_zero, bool* is_neg) {
         // TODO This might not work as intended
-        uint8_t sign = value.u64 >> 63;
-        uint16_t exp = (value.u64 >> 52) & 0x7ff;
-        uint64_t frac = value.u64 & 0xfffffffffffff;
+        Byte sign = value.u64 >> 63;
+        Half exp = (value.u64 >> 52) & 0x7ff;
+        Long frac = value.u64 & 0xfffffffffffff;
         
         if (is_inf) *is_inf = exp == 0x7ff && frac == 0;
         if (is_nan) *is_nan = exp == 0x7ff && frac != 0 && !(frac & 0x8000000000000);
@@ -723,12 +723,12 @@ bool VirtualMachine::Step(uint32_t steps) {
 
     using Type = RVInstruction::Type;
 
-    constexpr uint64_t RV_F32_NAN = 0xffffffff7fc00000;
-    constexpr uint64_t RV_F32_QNAN = 0xffffffffffc00000;
-    constexpr uint64_t RV_F64_NAN = 0x7ff0000000000000;
-    constexpr uint64_t RV_F64_QNAN = 0xfff0000000000000;
+    constexpr Long RV_F32_NAN = 0xffffffff7fc00000;
+    constexpr Long RV_F32_QNAN = 0xffffffffffc00000;
+    constexpr Long RV_F64_NAN = 0x7ff0000000000000;
+    constexpr Long RV_F64_QNAN = 0xfff0000000000000;
     
-    for (uint32_t i = 0; i < steps && running; i++) {
+    for (Word i = 0; i < steps && running; i++) {
         cycles++;
 
         if (waiting_for_interrupt) {
@@ -754,7 +754,7 @@ bool VirtualMachine::Step(uint32_t steps) {
             bool handled = false;
 
             if (pending_interrupts) {
-                for (uint32_t cause = 31; cause > 32; cause--) {
+                for (Word cause = 31; cause > 32; cause--) {
                     if (pending_interrupts & (1ULL << cause)) {
                         RaiseMachineTrap(cause | TRAP_INTERRUPT_BIT);
                         handled = true;
@@ -768,7 +768,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 pending_interrupts &= sie;
 
                 if (pending_interrupts) {
-                    for (uint32_t cause = 31; cause > 32; cause--) {
+                    for (Word cause = 31; cause > 32; cause--) {
                         if (pending_interrupts & (1ULL << cause)) {
                             RaiseSupervisorTrap(cause | TRAP_INTERRUPT_BIT);
                             break;
@@ -800,14 +800,14 @@ bool VirtualMachine::Step(uint32_t steps) {
                 break;
             
             case Type::JAL: {
-                uint32_t next_pc = pc + 4;
+                Word next_pc = pc + 4;
                 pc += instr.immediate;
                 regs[instr.rd] = next_pc;
                 break;
             }
             
             case Type::JALR: {
-                uint32_t next_pc = pc + 4;
+                Word next_pc = pc + 4;
                 pc = (regs[instr.rs1] + instr.immediate) & 0xfffffffe;
                 regs[instr.rd] = next_pc;
                 break;
@@ -968,7 +968,7 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::SRAI: {
                 auto amount = instr.rs2;
                 auto value = regs[instr.rs1] >> amount;
-                uint32_t sign = -1U << amount;
+                Word sign = -1U << amount;
 
                 if (regs[instr.rs1] & (1U << (32 - amount))) value |= sign;
                 regs[instr.rd] = value;
@@ -1010,7 +1010,7 @@ bool VirtualMachine::Step(uint32_t steps) {
             case Type::SRA: {
                 auto amount = regs[instr.rs2] & 0x1f;
                 auto value = regs[instr.rs1] >> amount;
-                uint32_t sign = -1U << amount;
+                Word sign = -1U << amount;
 
                 if (regs[instr.rs1] & (1U << (32 - amount))) value |= sign;
                 regs[instr.rd] = value;
@@ -1126,26 +1126,26 @@ bool VirtualMachine::Step(uint32_t steps) {
             }
             
             case Type::MULH: {
-                int64_t lhs = AsSigned(regs[instr.rs1]);
-                int64_t rhs = AsSigned(regs[instr.rs2]);
-                int64_t result = lhs * rhs;
-                regs[instr.rd] = AsUnsigned(static_cast<int32_t>(result >> 32));
+                SLong lhs = AsSigned(regs[instr.rs1]);
+                SLong rhs = AsSigned(regs[instr.rs2]);
+                SLong result = lhs * rhs;
+                regs[instr.rd] = AsUnsigned(static_cast<SWord>(result >> 32));
                 break;
             }
             
             case Type::MULHSU: {
-                int64_t lhs = AsSigned(regs[instr.rs1]);
-                uint64_t rhs = regs[instr.rs2];
-                int64_t result = lhs * rhs;
-                regs[instr.rd] = AsUnsigned(static_cast<int32_t>(result >> 32));
+                SLong lhs = AsSigned(regs[instr.rs1]);
+                Long rhs = regs[instr.rs2];
+                SLong result = lhs * rhs;
+                regs[instr.rd] = AsUnsigned(static_cast<SWord>(result >> 32));
                 break;
             }
             
             case Type::MULHU: {
-                uint64_t lhs = regs[instr.rs1];
-                uint64_t rhs = regs[instr.rs2];
+                Long lhs = regs[instr.rs1];
+                Long rhs = regs[instr.rs2];
                 auto result = lhs * rhs;
-                regs[instr.rd] = static_cast<uint32_t>(result >> 32);
+                regs[instr.rd] = static_cast<Word>(result >> 32);
                 break;
             }
 
@@ -1672,7 +1672,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 bool is_inf, is_nan, is_qnan;
                 ClassF32(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
                 
-                uint32_t result;
+                Word result;
 
                 if (is_inf) {
                     if (fregs[instr.rs1].f < 0) result = -1U;
@@ -1684,11 +1684,11 @@ bool VirtualMachine::Step(uint32_t steps) {
                     SetFloatFlags(false, false, false, false, true);
                 }
                 else {
-                    int32_t val = fregs[instr.rs1].f;
+                    SWord val = fregs[instr.rs1].f;
                     if (val != fregs[instr.rs1].f)
                         SetFloatFlags(false, false, false, false, true);
 
-                    result = AsUnsigned(static_cast<int32_t>(val));
+                    result = AsUnsigned(static_cast<SWord>(val));
                 }
 
                 regs[instr.rd] = result;
@@ -1705,7 +1705,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 bool is_inf, is_nan, is_qnan;
                 ClassF32(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
 
-                uint32_t result;
+                Word result;
 
                 if (is_inf) {
                     if (fregs[instr.rs1].f < 0) result = 0;
@@ -1717,7 +1717,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                     SetFloatFlags(false, false, false, false, true);
                 }
                 else {
-                    uint32_t val = fregs[instr.rs1].f;
+                    Word val = fregs[instr.rs1].f;
                     if (val != fregs[instr.rs1].f)
                         SetFloatFlags(false, false, false, false, true);
                     
@@ -1819,7 +1819,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 bool is_inf, is_nan, is_qnan, is_subnormal, is_zero, is_neg;
                 ClassF32(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, &is_subnormal, &is_zero, &is_neg);
                 
-                uint32_t result = 0;
+                Word result = 0;
                 if (is_inf && is_neg) result |= 1 << 0;
                 if (!is_subnormal && is_neg) result |= 1 << 1;
                 if (is_subnormal && is_neg) result |= 1 << 2;
@@ -1873,8 +1873,8 @@ bool VirtualMachine::Step(uint32_t steps) {
                 auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
                 if (!translation_valid) continue;
 
-                uint64_t val = memory.ReadWord(translated_address);
-                val |= static_cast<uint64_t>(memory.ReadWord(translated_address + 4)) << 32;
+                Long val = memory.ReadWord(translated_address);
+                val |= static_cast<Long>(memory.ReadWord(translated_address + 4)) << 32;
                 fregs[instr.rd] = ToDouble(val);
                 break;
             }
@@ -1884,8 +1884,8 @@ bool VirtualMachine::Step(uint32_t steps) {
                 if (!translation_valid) continue;
                 
                 auto val = ToUInt64(fregs[instr.rs2]);
-                memory.WriteWord(translated_address, static_cast<uint32_t>(val));
-                memory.WriteWord(translated_address + 4, static_cast<uint32_t>(val >> 32));
+                memory.WriteWord(translated_address, static_cast<Word>(val));
+                memory.WriteWord(translated_address + 4, static_cast<Word>(val >> 32));
                 break;
             }
             
@@ -2358,7 +2358,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 bool is_inf, is_nan, is_qnan, is_subnormal, is_zero, is_neg;
                 ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, &is_subnormal, &is_zero, &is_neg);
                 
-                uint32_t result = 0;
+                Word result = 0;
                 if (is_inf && is_neg) result |= 1 << 0;
                 if (!is_subnormal && is_neg) result |= 1 << 1;
                 if (is_subnormal && is_neg) result |= 1 << 2;
@@ -2384,7 +2384,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 bool is_inf, is_nan, is_qnan;
                 ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
                 
-                uint32_t result;
+                Word result;
 
                 if (is_inf) {
                     if (fregs[instr.rs1].d < 0) result = -1U;
@@ -2396,11 +2396,11 @@ bool VirtualMachine::Step(uint32_t steps) {
                     SetFloatFlags(false, false, false, false, true);
                 }
                 else {
-                    int32_t val = fregs[instr.rs1].d;
+                    SWord val = fregs[instr.rs1].d;
                     if (val != fregs[instr.rs1].d)
                         SetFloatFlags(false, false, false, false, true);
 
-                    result = AsUnsigned(static_cast<int32_t>(val));
+                    result = AsUnsigned(static_cast<SWord>(val));
                 }
 
                 regs[instr.rd] = result;
@@ -2417,7 +2417,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                 bool is_inf, is_nan, is_qnan;
                 ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
 
-                uint32_t result;
+                Word result;
 
                 if (is_inf) {
                     if (fregs[instr.rs1].d < 0) result = 0;
@@ -2429,7 +2429,7 @@ bool VirtualMachine::Step(uint32_t steps) {
                     SetFloatFlags(false, false, false, false, true);
                 }
                 else {
-                    uint32_t val = fregs[instr.rs1].d;
+                    Word val = fregs[instr.rs1].d;
                     if (val != fregs[instr.rs1].d)
                         SetFloatFlags(false, false, false, false, true);
                     
@@ -2629,23 +2629,23 @@ void VirtualMachine::Run() {
     }
 }
 
-void VirtualMachine::GetSnapshot(std::array<uint32_t, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, uint32_t& pc) {
+void VirtualMachine::GetSnapshot(std::array<Word, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, Word& pc) {
     registers = regs;
     fregisters = fregs;
     pc = this->pc;
 }
 
-void VirtualMachine::GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs) const {
+void VirtualMachine::GetCSRSnapshot(std::unordered_map<Word, Word>& csrs) const {
     csrs = this->csrs;
-    auto mcycle = static_cast<uint32_t>(cycles);
-    auto mcycleh = static_cast<uint32_t>(cycles >> 32);
+    auto mcycle = static_cast<Word>(cycles);
+    auto mcycleh = static_cast<Word>(cycles >> 32);
     csrs[CSR_MCYCLE] = mcycle;
     csrs[CSR_MCYCLEH] = mcycleh;
     csrs[CSR_CYCLE] = mcycle;
     csrs[CSR_CYCLEH] = mcycleh;
 
-    csrs[CSR_TIME] = static_cast<uint32_t>(csr_mapped_memory->time);
-    csrs[CSR_TIMEH] = static_cast<uint32_t>(csr_mapped_memory->time >> 32);
+    csrs[CSR_TIME] = static_cast<Word>(csr_mapped_memory->time);
+    csrs[CSR_TIMEH] = static_cast<Word>(csr_mapped_memory->time >> 32);
 
     csrs[CSR_MIP] = mip;
     csrs[CSR_MIE] = mie;
@@ -2661,7 +2661,7 @@ void VirtualMachine::GetCSRSnapshot(std::unordered_map<uint32_t, uint32_t>& csrs
 
 size_t VirtualMachine::GetInstructionsPerSecond() {
     double total_time = 0.0;
-    uint32_t total_ticks = 0;
+    Word total_ticks = 0;
 
     for (size_t i = 0; i < history_delta.size(); i++) {
         total_time += history_delta[i];
@@ -2671,7 +2671,7 @@ size_t VirtualMachine::GetInstructionsPerSecond() {
     return total_ticks / total_time;
 }
 
-bool VirtualMachine::IsBreakPoint(uint32_t addr) {
+bool VirtualMachine::IsBreakPoint(Address addr) {
     if (break_points.contains(addr)) return true;
 
     auto word = memory.PeekWord(addr);
@@ -2692,7 +2692,7 @@ void VirtualMachine::UpdateTime() {
     history_tick.push_back(ticks);
     ticks = 0;
     
-    csr_mapped_memory->time += static_cast<uint64_t>(delta_time() * CSRMappedMemory::TICKS_PER_SECOND);
+    csr_mapped_memory->time += static_cast<Long>(delta_time() * CSRMappedMemory::TICKS_PER_SECOND);
     if (csr_mapped_memory->time >= csr_mapped_memory->time_cmp)
         RaiseInterrupt(INTERRUPT_MACHINE_TIMER);
 
@@ -2702,8 +2702,8 @@ void VirtualMachine::UpdateTime() {
     }
 }
 
-void VirtualMachine::EmptyECallHandler(uint32_t hart, Memory&, std::array<uint32_t, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&) {
+void VirtualMachine::EmptyECallHandler(Word hart, Memory&, std::array<Word, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&) {
     throw std::runtime_error(std::format("Hart {} called unknown ECall handler: {}", hart, regs[REG_A0]));
 }
 
-std::unordered_map<uint32_t, VirtualMachine::ECallHandler> VirtualMachine::ecall_handlers;
+std::unordered_map<Word, VirtualMachine::ECallHandler> VirtualMachine::ecall_handlers;

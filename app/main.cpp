@@ -29,14 +29,14 @@
 #include "VirtualMachines.hpp"
 
 int main(int argc, const char** argv) {
-    constexpr size_t window_width = 800;
-    constexpr size_t window_height = 600;
+    constexpr Word window_width = 800;
+    constexpr Word window_height = 600;
     
     framebuffer_width = 800;
     framebuffer_height = 600;
     framebuffer_address = 0xffe00000;
 
-    uint32_t cores = 2;
+    Hart cores = 2;
 
     std::vector<std::string> args;
 
@@ -47,7 +47,7 @@ int main(int argc, const char** argv) {
     // Process command line args
     ArgsParser args_parser(args);
 
-    cores = args_parser.GetValueOr<uint32_t>("cores", 1);
+    cores = args_parser.GetValueOr<Hart>("cores", 1);
     
     if (!args_parser.HasValue("bios_file")) {
         std::cerr << "--bios_file is required" << std::endl;
@@ -64,11 +64,11 @@ int main(int argc, const char** argv) {
 
     Window window("RV32IMF", window_width, window_height);
     {
-        constexpr uint32_t BIOS_RAM_ADDRESS = 0x1000;
+        constexpr Address BIOS_RAM_ADDRESS = 0x1000;
 
         Memory memory;
         {
-            auto ram = MemoryRAM::Create(BIOS_RAM_ADDRESS, 2 * 1024 * 1024);
+            auto ram = MemoryRAM::Create(BIOS_RAM_ADDRESS, 16 * 1024 * 1024);
             memory.AddMemoryRegion(std::move(ram));
         }
         memory.ReadFileInto(bios_path, BIOS_RAM_ADDRESS);
@@ -76,8 +76,8 @@ int main(int argc, const char** argv) {
         auto framebuffer = MemoryFramebuffer::Create(framebuffer_address, framebuffer_width, framebuffer_height);
         memory.AddMemoryRegion(framebuffer);
 
-        std::vector<uint32_t> harts;
-        for (uint32_t i = 0; i < cores; i++) {
+        std::vector<Hart> harts;
+        for (Hart i = 0; i < cores; i++) {
             vms.push_back(std::make_shared<VirtualMachine>(memory, BIOS_RAM_ADDRESS, i));
             harts.push_back(i);
         }

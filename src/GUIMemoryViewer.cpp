@@ -42,7 +42,7 @@ void GUIMemoryViewer::CreateStyle() {
 }
 
 void GUIMemoryViewer::UpdateBuffer() {
-    uint64_t end_address = static_cast<uint64_t>(read_address) + Memory::PAGE_SIZE;
+    Address end_address = static_cast<Address>(read_address) + Memory::PAGE_SIZE;
     end_address = end_address < memory.GetMaxAddress() ? end_address : memory.GetMaxAddress();
     
     if (read_address >= memory.GetMaxAddress()) {
@@ -50,10 +50,10 @@ void GUIMemoryViewer::UpdateBuffer() {
         return;
     }
     
-    data_buffer = memory.PeekWords(read_address, (end_address - read_address) / sizeof(uint32_t));
+    data_buffer = memory.PeekWords(read_address, (end_address - read_address) / sizeof(Word));
 }
 
-GUIMemoryViewer::GUIMemoryViewer(Memory& memory, std::shared_ptr<VirtualMachine> vm, uint32_t read_address) : memory{memory}, read_address{read_address}, vm{vm} {
+GUIMemoryViewer::GUIMemoryViewer(Memory& memory, std::shared_ptr<VirtualMachine> vm, Address read_address) : memory{memory}, read_address{read_address}, vm{vm} {
     UpdateBuffer();
 }
 
@@ -74,7 +74,7 @@ void GUIMemoryViewer::Draw() {
 
         ImGuiListClipper clipper;
 
-        size_t lines = static_cast<size_t>(ceilf(static_cast<float>(data_buffer.size()) / sizeof(uint32_t)));
+        size_t lines = static_cast<size_t>(ceilf(static_cast<float>(data_buffer.size()) / sizeof(Word)));
         clipper.Begin(lines, style->line_height);
 
         ImVec2 window_pos = ImGui::GetWindowPos();
@@ -98,8 +98,8 @@ void GUIMemoryViewer::Draw() {
 
         while (clipper.Step()) {
             for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-                uint32_t index = i * COLUMNS;
-                uint32_t addr = index + read_address;
+                Address index = i * COLUMNS;
+                Address addr = index + read_address;
 
                 ImGui::Text("0x%08x", addr);
 
@@ -112,15 +112,15 @@ void GUIMemoryViewer::Draw() {
 
                     float ascii_pos_x = c * style->glyph_width + style->ascii_start;
 
-                    uint32_t byte_index = index + c;
+                    Address byte_index = index + c;
                     if ((byte_index >> 2) >= data_buffer.size()) {
                         ImGui::Text("..");
                         ImGui::SameLine(ascii_pos_x);
                         ImGui::Text(" ");
                     } else {
                         if (data_buffer[byte_index >> 2].second) {
-                            uint32_t value = data_buffer[byte_index >> 2].first;
-                            uint8_t byte = value >> (8 * (byte_index & 0b11));
+                            Word value = data_buffer[byte_index >> 2].first;
+                            Byte byte = value >> (8 * (byte_index & 0b11));
 
                             if (addr + c == vm->GetPC()) {
                                 ImGui::TextColored(gui_pc_highlight_color, "%02x", byte);
@@ -168,7 +168,7 @@ void GUIMemoryViewer::Draw() {
             sprintf(buffer, "%x", read_address);
             text_input_buffer = buffer;
         } else if (view_button || enter) {
-            uint32_t aligned_address = read_address;
+            Address aligned_address = read_address;
             try {
                 aligned_address = std::stoul(text_input_buffer, nullptr, 16);
             } catch (...) {

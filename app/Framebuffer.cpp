@@ -5,7 +5,7 @@
 #include <iostream>
 #include <cstdlib>
 
-MemoryFramebuffer::MemoryFramebuffer(uint32_t base, uint32_t size, size_t width, size_t height) : MemoryRegion(TYPE_FRAMEBUFFER, base, size, true, true), width{width}, height{height} {
+MemoryFramebuffer::MemoryFramebuffer(Address base, Address size, Word width, Word height) : MemoryRegion(TYPE_FRAMEBUFFER, base, size, true, true), width{width}, height{height} {
     word_buffer.resize(size, 0);
     for (auto& word : word_buffer)
         word = 0;
@@ -133,10 +133,10 @@ void MemoryFramebuffer::DrawBuffer() const {
     glDrawArrays(GL_TRIANGLES, 0, 6);
 }
 
-std::shared_ptr<MemoryFramebuffer> MemoryFramebuffer::Create(uint32_t base, size_t width, size_t height) {
-    uint32_t size = width * height * 4;
+std::shared_ptr<MemoryFramebuffer> MemoryFramebuffer::Create(Address base, Word width, Word height) {
+    Address size = width * height * 4;
 
-    size = (size + sizeof(uint32_t) - 1) & ~(sizeof(uint32_t) - 1);
+    size = (size + sizeof(Word) - 1) & ~(sizeof(Word) - 1);
 
     return std::shared_ptr<MemoryFramebuffer>(new MemoryFramebuffer(base & ~3, size, width, height));
 }

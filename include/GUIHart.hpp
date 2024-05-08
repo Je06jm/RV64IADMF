@@ -4,16 +4,16 @@
 #include "VirtualMachine.hpp"
 
 class GUIHart {
-    uint32_t selected_hart = 0;
-    const std::vector<uint32_t> harts;
+    Hart selected_hart = 0;
+    const std::vector<Hart> harts;
     
 public:
     std::vector<std::shared_ptr<VirtualMachine>> vms;
 
-    GUIHart(std::vector<std::shared_ptr<VirtualMachine>> vms, const std::vector<uint32_t>& harts) : vms{vms}, harts{harts} {}
+    GUIHart(std::vector<std::shared_ptr<VirtualMachine>> vms, const std::vector<Hart>& harts) : vms{vms}, harts{harts} {}
     ~GUIHart() = default;
 
-    inline uint32_t GetSelectedHart() const {
+    inline Hart GetSelectedHart() const {
         return harts[selected_hart];
     }
 

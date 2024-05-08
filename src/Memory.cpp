@@ -4,17 +4,17 @@
 #include <format>
 #include <fstream>
 
-uint16_t MemoryRegion::ReadHalf(uint32_t address) const {
+Half MemoryRegion::ReadHalf(Address address) const {
     auto word = ReadWord(address & ~3);
-    return static_cast<uint16_t>(word >> ((address & 2) * 8));
+    return static_cast<Half>(word >> ((address & 2) * 8));
 }
 
-uint8_t MemoryRegion::ReadByte(uint32_t address) const {
+Byte MemoryRegion::ReadByte(Address address) const {
     auto word = ReadWord(address & ~3);
-    return static_cast<uint8_t>(word >> ((address & 3) * 8));
+    return static_cast<Byte>(word >> ((address & 3) * 8));
 }
 
-void MemoryRegion::WriteHalf(uint32_t address, uint16_t half) {
+void MemoryRegion::WriteHalf(Address address, Half half) {
     auto word = ReadWord(address & ~3);
     auto shift = (address & 2) * 8;
     word &= ~(0xffff << shift);
@@ -22,7 +22,7 @@ void MemoryRegion::WriteHalf(uint32_t address, uint16_t half) {
     WriteWord(address & ~3, word);
 }
 
-void MemoryRegion::WriteByte(uint32_t address, uint8_t byte) {
+void MemoryRegion::WriteByte(Address address, Byte byte) {
     auto word = ReadWord(address & ~3);
     auto shift = (address & 3) * 8;
     word &= ~(0xff << shift);
@@ -30,18 +30,18 @@ void MemoryRegion::WriteByte(uint32_t address, uint8_t byte) {
     WriteWord(address & ~3, word);
 }
 
-std::unique_ptr<MemoryROM> MemoryROM::Create(const std::vector<uint32_t>& words, uint32_t base) {
+std::unique_ptr<MemoryROM> MemoryROM::Create(const std::vector<Word>& words, Address base) {
     return std::unique_ptr<MemoryROM>(new MemoryROM(words, base & ~3));
 }
 
-MemoryRAM::MemoryRAM(uint32_t base, uint32_t size) : MemoryRegion(TYPE_GENERAL_RAM, base, size, true, true) {
+MemoryRAM::MemoryRAM(Address base, Address size) : MemoryRegion(TYPE_GENERAL_RAM, base, size, true, true) {
     size_t pages_count = size / WORDS_PER_PAGE;
 
     for (size_t i = 0; i < pages_count; i++)
         pages.push_back(nullptr);
 }
 
-uint32_t MemoryRAM::ReadWord(uint32_t address) const {
+Word MemoryRAM::ReadWord(Address address) const {
     size_t page = address / WORDS_PER_PAGE;
     address %= PAGE_SIZE;
 
@@ -50,7 +50,7 @@ uint32_t MemoryRAM::ReadWord(uint32_t address) const {
     return (*pages[page])[address >> 2];
 }
 
-void MemoryRAM::WriteWord(uint32_t address, uint32_t word) {
+void MemoryRAM::WriteWord(Address address, Word word) {
     size_t page = address / WORDS_PER_PAGE;
     address %= PAGE_SIZE;
 
@@ -59,36 +59,36 @@ void MemoryRAM::WriteWord(uint32_t address, uint32_t word) {
     (*pages[page])[address >> 2] = word;
 }
 
-std::unique_ptr<MemoryRAM> MemoryRAM::Create(uint32_t base, uint32_t size) {
+std::unique_ptr<MemoryRAM> MemoryRAM::Create(Address base, Address size) {
     size = (size + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1);
     
     return std::unique_ptr<MemoryRAM>(new MemoryRAM(base & ~3, size));
 }
 
 union U32S32 {
-    uint32_t u;
-    int32_t s;
+    Word u;
+    SWord s;
 };
 
-MemoryRegion* Memory::GetMemoryRegion(uint32_t address) {
+MemoryRegion* Memory::GetMemoryRegion(Address address) {
     for (auto& region : regions) {
-        uint32_t end = region->base + region->size;
+        Address end = region->base + region->size;
         if (address >= region->base && address < end)
             return region.get();
     }
     return nullptr;
 }
 
-const MemoryRegion* Memory::GetMemoryRegion(uint32_t address) const {
+const MemoryRegion* Memory::GetMemoryRegion(Address address) const {
     for (const auto& region : regions) {
-        uint32_t end = region->base + region->size;
+        Address end = region->base + region->size;
         if (address >= region->base && address < end)
             return region.get();
     }
     return nullptr;
 }
 
-uint32_t Memory::ReadWord(uint32_t address) const {
+Word Memory::ReadWord(Address address) const {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -108,7 +108,7 @@ uint32_t Memory::ReadWord(uint32_t address) const {
     return word;
 }
 
-uint16_t Memory::ReadHalf(uint32_t address) const {
+Half Memory::ReadHalf(Address address) const {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -128,7 +128,7 @@ uint16_t Memory::ReadHalf(uint32_t address) const {
     return half;
 }
 
-uint8_t Memory::ReadByte(uint32_t address) const {
+Byte Memory::ReadByte(Address address) const {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -145,7 +145,7 @@ uint8_t Memory::ReadByte(uint32_t address) const {
     return byte;
 }
 
-std::pair<uint32_t, bool> Memory::PeekWord(uint32_t address) const {
+std::pair<Word, bool> Memory::PeekWord(Address address) const {
     if (address & 3)
         throw std::runtime_error(std::format("Unaligned read of word at {:#10x}", address));
 
@@ -162,7 +162,7 @@ std::pair<uint32_t, bool> Memory::PeekWord(uint32_t address) const {
     return {word, true};
 }
 
-bool Memory::TryWriteWord(uint32_t address, uint32_t word) {
+bool Memory::TryWriteWord(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -181,7 +181,7 @@ bool Memory::TryWriteWord(uint32_t address, uint32_t word) {
     return true;
 }
 
-void Memory::WriteWord(uint32_t address, uint32_t word) {
+void Memory::WriteWord(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -199,7 +199,7 @@ void Memory::WriteWord(uint32_t address, uint32_t word) {
     region->WriteWord(address - region->base, word);
 }
 
-void Memory::WriteHalf(uint32_t address, uint16_t half) {
+void Memory::WriteHalf(Address address, Half half) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -217,7 +217,7 @@ void Memory::WriteHalf(uint32_t address, uint16_t half) {
     region->WriteHalf(address - region->base, half);
 }
 
-void Memory::WriteByte(uint32_t address, uint8_t byte) {
+void Memory::WriteByte(Address address, Byte byte) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -232,7 +232,7 @@ void Memory::WriteByte(uint32_t address, uint8_t byte) {
     region->WriteByte(address - region->base, byte);
 }
 
-uint32_t Memory::AtomicSwap(uint32_t address, uint32_t word) {
+Word Memory::AtomicSwap(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -258,7 +258,7 @@ uint32_t Memory::AtomicSwap(uint32_t address, uint32_t word) {
     return old_word;
 }
 
-uint32_t Memory::AtomicAdd(uint32_t address, uint32_t word) {
+Word Memory::AtomicAdd(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -284,7 +284,7 @@ uint32_t Memory::AtomicAdd(uint32_t address, uint32_t word) {
     return old_word;
 }
 
-uint32_t Memory::AtomicAnd(uint32_t address, uint32_t word) {
+Word Memory::AtomicAnd(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -310,7 +310,7 @@ uint32_t Memory::AtomicAnd(uint32_t address, uint32_t word) {
     return old_word;
 }
 
-uint32_t Memory::AtomicOr(uint32_t address, uint32_t word) {
+Word Memory::AtomicOr(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -336,7 +336,7 @@ uint32_t Memory::AtomicOr(uint32_t address, uint32_t word) {
     return old_word;
 }
 
-uint32_t Memory::AtomicXor(uint32_t address, uint32_t word) {
+Word Memory::AtomicXor(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -362,7 +362,7 @@ uint32_t Memory::AtomicXor(uint32_t address, uint32_t word) {
     return old_word;
 }
 
-int32_t Memory::AtomicMin(uint32_t address, int32_t word) {
+int32_t Memory::AtomicMin(Address address, int32_t word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -392,7 +392,7 @@ int32_t Memory::AtomicMin(uint32_t address, int32_t word) {
     return old_word;
 }
 
-uint32_t Memory::AtomicMinU(uint32_t address, uint32_t word) {
+Word Memory::AtomicMinU(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -418,7 +418,7 @@ uint32_t Memory::AtomicMinU(uint32_t address, uint32_t word) {
     return old_word;
 }
 
-int32_t Memory::AtomicMax(uint32_t address, int32_t word) {
+int32_t Memory::AtomicMax(Address address, int32_t word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -448,7 +448,7 @@ int32_t Memory::AtomicMax(uint32_t address, int32_t word) {
     return old_word;
 }
 
-uint32_t Memory::AtomicMaxU(uint32_t address, uint32_t word) {
+Word Memory::AtomicMaxU(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
@@ -474,27 +474,27 @@ uint32_t Memory::AtomicMaxU(uint32_t address, uint32_t word) {
     return old_word;
 }
 
-void Memory::WriteWords(uint32_t address, const std::vector<uint32_t>& words) {
-    for (uint32_t head = address, i = 0; i < words.size(); i++, head += 4) {
+void Memory::WriteWords(Address address, const std::vector<Word>& words) {
+    for (Address head = address, i = 0; i < words.size(); i++, head += 4) {
         WriteWord(head, words[i]);
     }
 }
 
-std::vector<uint32_t> Memory::ReadWords(uint32_t address, uint32_t count) const {
-    std::vector<uint32_t> data;
-    for (uint32_t head = address, i = 0; i < count; i++, head += 4) {
+std::vector<Word> Memory::ReadWords(Address address, Address count) const {
+    std::vector<Word> data;
+    for (Address head = address, i = 0; i < count; i++, head += 4) {
         data.push_back(ReadWord(head));
     }
 
     return data;
 }
 
-std::vector<std::pair<uint32_t, bool>> Memory::PeekWords(uint32_t address, uint32_t count) const {
-    std::vector<std::pair<uint32_t, bool>> data;
+std::vector<std::pair<Word, bool>> Memory::PeekWords(Address address, Address count) const {
+    std::vector<std::pair<Word, bool>> data;
 
     const MemoryRegion* region = nullptr;
-    uint32_t end;
-    for (uint32_t head = address, i = 0; i < count; i++, head += 4) {
+    Address end;
+    for (Address head = address, i = 0; i < count; i++, head += 4) {
         if (!region) {
             region = GetMemoryRegion(head);
             if (region) {
@@ -519,7 +519,7 @@ std::vector<std::pair<uint32_t, bool>> Memory::PeekWords(uint32_t address, uint3
     return data;
 }
 
-uint32_t Memory::ReadWordReserved(uint32_t address, uint32_t cpu_id) const {
+Word Memory::ReadWordReserved(Address address, Hart hart_id) const {
     lock.lock();
     for (auto& item : reservations) {
         if (item.second == (address & ~0b11)) {
@@ -528,26 +528,26 @@ uint32_t Memory::ReadWordReserved(uint32_t address, uint32_t cpu_id) const {
         }
     }
     
-    reservations[cpu_id] = address & ~0b11;
+    reservations[hart_id] = address & ~0b11;
     lock.unlock();
 
     return ReadWord(address);
 }
 
-bool Memory::WriteWordConditional(uint32_t address, uint32_t value, uint32_t cpu_id) {
+bool Memory::WriteWordConditional(Address address, Word value, Hart hart_id) {
     lock.lock();
-    if (reservations.find(cpu_id) == reservations.end()) {
+    if (reservations.find(hart_id) == reservations.end()) {
         lock.unlock();
         return false;
     }
 
-    if (reservations[cpu_id] != (address & ~0b11)) {
-        auto addr = reservations[cpu_id];
+    if (reservations[hart_id] != (address & ~0b11)) {
+        auto addr = reservations[hart_id];
         lock.unlock();
         return false;
     }
 
-    reservations.erase(cpu_id);
+    reservations.erase(hart_id);
 
     lock.unlock();
 
@@ -555,20 +555,20 @@ bool Memory::WriteWordConditional(uint32_t address, uint32_t value, uint32_t cpu
     return true;
 }
 
-uint32_t Memory::ReadFileInto(const std::string& path, uint32_t address) {
+Address Memory::ReadFileInto(const std::string& path, Address address) {
     std::ifstream file(path, std::ios_base::binary | std::ios_base::ate);
 
     if (!file.is_open()) {
         throw std::runtime_error(std::format("Could not open {} for reading", path));
     }
 
-    uint32_t size = file.tellg();
-    uint32_t words = size / 4;
+    Address size = file.tellg();
+    Word words = size / 4;
     if (size % 4) words++;
     
     file.seekg(0);
 
-    std::vector<uint32_t> data(words);
+    std::vector<Word> data(words);
     data[words - 1] = 0;
 
     file.read(reinterpret_cast<char*>(data.data()), size);
@@ -579,14 +579,14 @@ uint32_t Memory::ReadFileInto(const std::string& path, uint32_t address) {
     return size;
 }
 
-void Memory::WriteToFile(const std::string& path, uint32_t address, uint32_t bytes) {
+void Memory::WriteToFile(const std::string& path, Address address, Address bytes) {
     std::ofstream file(path, std::ios_base::binary);
 
     if (!file.is_open()) {
         throw std::runtime_error(std::format("Could not open {} for writing", path));
     }
 
-    uint32_t count = (bytes + 3) / 4;
+    Address count = (bytes + 3) / 4;
     
     auto data = ReadWords(address, count);
 

@@ -10,7 +10,7 @@
 class GUIAssembly {
     Memory& memory;
 
-    uint32_t last_pc = 0;
+    Address last_pc = 0;
 
     static constexpr size_t WINDOW = 128;
     static constexpr size_t WINDOW_SLIDE = 12;

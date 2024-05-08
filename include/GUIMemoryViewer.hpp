@@ -30,15 +30,15 @@ class GUIMemoryViewer {
     void CreateStyle();
     void UpdateBuffer();
 
-    std::vector<std::pair<uint32_t, bool>> data_buffer;
-    uint32_t read_address = 0;
+    std::vector<std::pair<Word, bool>> data_buffer;
+    Address read_address = 0;
 
     std::string text_input_buffer = "0";
 
 public:
     std::shared_ptr<VirtualMachine> vm;
     
-    GUIMemoryViewer(Memory& memory, std::shared_ptr<VirtualMachine> vm, uint32_t read_address = 0);
+    GUIMemoryViewer(Memory& memory, std::shared_ptr<VirtualMachine> vm, Address read_address = 0);
     ~GUIMemoryViewer() = default;
 
     void Draw();

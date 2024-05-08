@@ -3,29 +3,31 @@
 
 #include <cstdint>
 
-// void ecall_cout(const char* buffer, uint32_t count);
-constexpr uint32_t ECALL_COUT = 0;
+#include <Types.hpp>
 
-// uint32_t ecall_cin(const char* buffer, uint32_t buffer_size);
-constexpr uint32_t ECALL_CIN = 1;
+// void ecall_cout(const char* buffer, Word count);
+constexpr Word ECALL_COUT = 0;
 
-// void ecall_start_cpu(uint32_t hart, uint32_t pc);
-constexpr uint32_t ECALL_START_CPU = -6U;
+// Word ecall_cin(const char* buffer, Word buffer_size);
+constexpr Word ECALL_CIN = 1;
 
-// uint32_t ecall_get_cpus(uint32_t* harts);
-constexpr uint32_t ECALL_GET_CPUS = -5U;
+// void ecall_start_cpu(Word hart, Word pc);
+constexpr Word ECALL_START_CPU = -6U;
 
-// uint32_t ecall_get_screen_address();
-constexpr uint32_t ECALL_GET_SCREEN_ADDRESS = -4U;
+// Word ecall_get_cpus(Hart* harts);
+constexpr Word ECALL_GET_CPUS = -5U;
 
-// void ecall_get_screen_size(uint32_t* x, uint32_t* y);
-constexpr uint32_t ECALL_GET_SCREEN_SIZE = -3U;
+// Word ecall_get_screen_address();
+constexpr Word ECALL_GET_SCREEN_ADDRESS = -4U;
 
-// uint32_t ecall_get_memory_size();
-constexpr uint32_t ECALL_GET_MEMORY_SIZE = -2U;
+// void ecall_get_screen_size(Word* x, Word* y);
+constexpr Word ECALL_GET_SCREEN_SIZE = -3U;
 
-// void ecall_exit(uint32_t exit_code)
-constexpr uint32_t ECALL_EXIT = -1U;
+// Word ecall_get_memory_size();
+constexpr Word ECALL_GET_MEMORY_SIZE = -2U;
+
+// void ecall_exit(Word exit_code)
+constexpr Word ECALL_EXIT = -1U;
 
 void RegisterECalls();
 
