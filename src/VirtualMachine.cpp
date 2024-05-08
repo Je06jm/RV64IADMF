@@ -1,7 +1,6 @@
 #include "VirtualMachine.hpp"
 
 #include "RV32I.hpp"
-#include "DeltaTime.hpp"
 
 #include <format>
 #include <cassert>
@@ -2687,12 +2686,12 @@ bool VirtualMachine::IsBreakPoint(Address addr) {
     return instr.type == RVInstruction::Type::EBREAK;
 }
 
-void VirtualMachine::UpdateTime() {
-    history_delta.push_back(delta_time());
+void VirtualMachine::UpdateTime(double delta_time) {
+    history_delta.push_back(delta_time);
     history_tick.push_back(ticks);
     ticks = 0;
     
-    csr_mapped_memory->time += static_cast<Long>(delta_time() * CSRMappedMemory::TICKS_PER_SECOND);
+    csr_mapped_memory->time += static_cast<Long>(delta_time * CSRMappedMemory::TICKS_PER_SECOND);
     if (csr_mapped_memory->time >= csr_mapped_memory->time_cmp)
         RaiseInterrupt(INTERRUPT_MACHINE_TIMER);
 

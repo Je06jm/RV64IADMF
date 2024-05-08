@@ -1,17 +1,17 @@
-#include <Window.hpp>
-#include <OpenGL.hpp>
-#include <DeltaTime.hpp>
+#include "Window.hpp"
+#include "OpenGL.hpp"
+#include "DeltaTime.hpp"
 
 #include <Memory.hpp>
 #include <RV32I.hpp>
 
-#include <GUIMemoryViewer.hpp>
-#include <GUIAssembly.hpp>
-#include <GUIInfo.hpp>
-#include <GUIRegs.hpp>
-#include <GUIHart.hpp>
-#include <GUIStack.hpp>
-#include <GUICSR.hpp>
+#include "GUIMemoryViewer.hpp"
+#include "GUIAssembly.hpp"
+#include "GUIInfo.hpp"
+#include "GUIRegs.hpp"
+#include "GUIHart.hpp"
+#include "GUIStack.hpp"
+#include "GUICSR.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -138,7 +138,7 @@ int main(int argc, const char** argv) {
             ImGui::NewFrame();
 
             for (auto& vm : vms)
-                vm->UpdateTime();
+                vm->UpdateTime(delta_time());
 
             auto vm = vms[gui_harts.GetSelectedHart()];
             mem_viewer.vm = vm;

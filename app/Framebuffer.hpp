@@ -1,12 +1,12 @@
 #ifndef APP_FRAMEBUFFER_HPP
 #define APP_FRAMEBUFFER_HPP
 
-#include <Memory.hpp>
-#include <OpenGL.hpp>
+#include "OpenGL.hpp"
 
 #include <vector>
 
 #include <Types.hpp>
+#include <Memory.hpp>
 
 inline Word framebuffer_width;
 inline Word framebuffer_height;

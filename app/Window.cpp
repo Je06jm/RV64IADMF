@@ -1,5 +1,5 @@
 #include "Window.hpp"
-#include <OpenGL.hpp>
+#include "OpenGL.hpp"
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>

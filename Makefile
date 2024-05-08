@@ -13,11 +13,12 @@ IMGUI = $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_im
 CXX_SOURCES = $(wildcard src/*.cpp) $(wildcard thirdparties/imgui/*.cpp) $(IMGUI)
 CXX_OBJS = $(patsubst %.cpp,%.o,$(CXX_SOURCES))
 
-CC_SOURCES = $(wildcard src/*.c)
-CC_OBJS = $(patsubst %.c,%.o,$(CC_SOURCES))
-
 APP_SOURES = $(wildcard app/*.cpp)
 APP_OBJS = $(patsubst %.cpp,%.o,$(APP_SOURES))
+
+APP_CC_SOURCES = $(wildcard app/*.c)
+APP_CC_OBJS = $(patsubst %.c,%.o,$(APP_CC_SOURCES))
+
 APP_FLAGS = -Isrc
 
 CXX_HEADERS = $(wildcard src/*.hpp)
@@ -58,16 +59,16 @@ BIOS = bios
 	$(BIOS_CC) $(BIOS_CC_FLAGS) -c $< -o $@
 
 library: CXX_FLAGS += -O3
-library: $(CXX_OBJS) $(CC_OBJS) $(CXX_HEADERS)
-	$(AR) $(AR_FLAGS) $(LIBRARY) $(CXX_OBJS) $(CC_OBJS)
+library: $(CXX_OBJS) $(CXX_HEADERS)
+	$(AR) $(AR_FLAGS) $(LIBRARY) $(CXX_OBJS)
 
 debug_library: CXX_FLAGS += -g
-debug_library: $(CXX_OBJS) $(CC_OBJS) $(CXX_HEADERS)
-	$(AR) $(AR_FLAGS) $(LIBRARY) $(CXX_OBJS) $(CC_OBJS)
+debug_library: $(CXX_OBJS) $(CXX_HEADERS)
+	$(AR) $(AR_FLAGS) $(LIBRARY) $(CXX_OBJS)
 
 all: CXX_FLAGS += $(APP_FLAGS)
-all: library $(APP_OBJS)
-	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O3
+all: library $(APP_OBJS)  $(APP_CC_OBJS)
+	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(APP_CC_OBJS) $(LD_FLAGS) -O3
 
 debug: CXX_FLAGS += $(APP_FLAGS)
 debug: debug_library
@@ -82,7 +83,7 @@ bios: $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS) $(BIOS_CC_HEADERS)
 clean:
 	@-rm $(PROGRAM)
 	@-rm $(CXX_OBJS)
-	@-rm $(CC_OBJS)
+	@-rm $(APP_CC_OBJS)
 	@-rm $(APP_OBJS)
 	@-rm $(LIBRARY)
 

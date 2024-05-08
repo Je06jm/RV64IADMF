@@ -531,7 +531,7 @@ public:
 
     bool IsBreakPoint(Address addr);
 
-    void UpdateTime();
+    void UpdateTime(double delta_time);
 
     using ECallHandler = std::function<void(Word hart, Memory& memory, std::array<Word, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>& fregs)>;
 

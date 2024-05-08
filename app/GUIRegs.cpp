@@ -1,6 +1,6 @@
-#include <GUIRegs.hpp>
+#include "GUIRegs.hpp"
 
-#include <GUIConstants.hpp>
+#include "GUIConstants.hpp"
 
 #include <imgui.h>
 
