@@ -1,6 +1,6 @@
 #include <Memory.hpp>
 #include <VirtualMachine.hpp>
-#include <RV32I.hpp>
+#include <RV64.hpp>
 #include <ECalls.hpp>
 
 int main() {

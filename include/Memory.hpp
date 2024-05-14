@@ -14,56 +14,59 @@
 
 class MemoryRegion {
 public:
-    const uint32_t type;
+    const Word type;
+    const Word flags;
     const Address base, size;
     const bool readable, writable;
 
-    static constexpr uint32_t TYPE_UNKNOWN = -1U;
-    static constexpr uint32_t TYPE_UNUSED = 0;
-    static constexpr uint32_t TYPE_PMA_ROM = 1;
-    static constexpr uint32_t TYPE_MAPPED_CSRS = 2;
-    static constexpr uint32_t TYPE_BIOS_ROM = 4;
-    static constexpr uint32_t TYPE_GENERAL_RAM = 5;
-    static constexpr uint32_t TYPE_FRAMEBUFFER = 8;
+    static constexpr Word TYPE_UNKNOWN = -1U;
+    static constexpr Word TYPE_UNUSED = 0;
+    static constexpr Word TYPE_PMA_ROM = 1;
+    static constexpr Word TYPE_MAPPED_CSRS = 2;
+    static constexpr Word TYPE_BIOS_ROM = 4;
+    static constexpr Word TYPE_GENERAL_RAM = 5;
+    static constexpr Word TYPE_FRAMEBUFFER = 8;
 
-    MemoryRegion(uint32_t type, Address base, Address size, bool readable, bool writable) : type{type}, base{base}, size{size}, readable{readable}, writable{writable} {}
+    MemoryRegion(Word type, Word flags, Address base, Address size, bool readable, bool writable) : type{type}, flags{flags}, base{base}, size{size}, readable{readable}, writable{writable} {}
     virtual ~MemoryRegion() = default;
 
-    virtual Word ReadWord(Address) const { return 0; }
+    virtual Long ReadLong(Address) const { return 0; }
+    virtual Word ReadWord(Address) const;
     virtual Half ReadHalf(Address) const;
     virtual Byte ReadByte(Address) const;
 
-    virtual void WriteWord(Address, Word) {}
+    virtual void WriteLong(Address, Long) {}
+    virtual void WriteWord(Address, Word);
     virtual void WriteHalf(Address, Half);
     virtual void WriteByte(Address, Byte);
 
     virtual void Lock() const = 0;
     virtual void Unlock() const = 0;
 
-    virtual size_t SizeInMemory() const { return size; }
+    virtual Long SizeInMemory() const { return size; }
 };
 
 class MemoryROM : public MemoryRegion {
 private:
-    const std::vector<Word> words;
+    const std::vector<Long> longs;
 
-    MemoryROM(const std::vector<Word>& words, Address base) : MemoryRegion(TYPE_BIOS_ROM, base, words.size() * sizeof(Word), true, false), words{words} {}
+    MemoryROM(const std::vector<Long>& longs, Address base) : MemoryRegion(TYPE_BIOS_ROM, 0, base, longs.size() * sizeof(Long), true, false), longs{longs} {}
 public:
-    Word ReadWord(Address address) const override { return words[address >> 2]; }
+    Long ReadLong(Address address) const override { return longs[address >> 3]; }
     
     void Lock() const override {}
     void Unlock() const override {}
 
-    static std::unique_ptr<MemoryROM> Create(const std::vector<Word>& words, Address base);
+    static std::unique_ptr<MemoryROM> Create(const std::vector<Long>& longs, Address base);
 };
 
 class MemoryRAM : public MemoryRegion {
 public:
-    static constexpr size_t PAGE_SIZE = 0x1000;
-    static constexpr size_t WORDS_PER_PAGE = PAGE_SIZE / sizeof(uint32_t);
+    static constexpr Long PAGE_SIZE = 0x1000;
+    static constexpr Long LONGS_PER_PAGE = PAGE_SIZE / sizeof(Long);
 
 private:
-    using Page = std::array<Word, WORDS_PER_PAGE>;
+    using Page = std::array<Long, LONGS_PER_PAGE>;
     using PagePtr = std::unique_ptr<Page>;
     mutable std::vector<PagePtr> pages;
     mutable size_t loaded_pages = 0;
@@ -88,23 +91,23 @@ private:
 
     mutable std::mutex lock;
 public:
-    Word ReadWord(Address address) const override;
-    void WriteWord(Address address, Word word) override;
+    Long ReadLong(Address address) const override;
+    void WriteLong(Address address, Long vlong) override;
 
     void Lock() const override { lock.lock(); }
     void Unlock() const override { lock.unlock(); }
 
-    size_t SizeInMemory() const override { return loaded_pages * PAGE_SIZE; }
+    Long SizeInMemory() const override { return loaded_pages * PAGE_SIZE; }
 
     static std::unique_ptr<MemoryRAM> Create(Address base, Address size);
 };
 
 class Memory {
 public:
-    static constexpr size_t TOTAL_MEMORY = 0x100000000;
-    static constexpr size_t PAGE_SIZE = 0x1000;
-    static constexpr size_t TOTAL_PAGES = TOTAL_MEMORY / PAGE_SIZE;
-    static constexpr size_t WORDS_PER_PAGE = PAGE_SIZE / sizeof(Word);
+    static constexpr Long TOTAL_MEMORY = 0x100000000;
+    static constexpr Long PAGE_SIZE = 0x1000;
+    static constexpr Long TOTAL_PAGES = TOTAL_MEMORY / PAGE_SIZE;
+    static constexpr Long WORDS_PER_PAGE = PAGE_SIZE / sizeof(Word);
 
 private:
     std::vector<std::shared_ptr<MemoryRegion>> regions;
@@ -123,10 +126,10 @@ private:
         const std::vector<std::shared_ptr<MemoryRegion>>& regions;
 
     public:
-        MemoryPMARom(std::vector<std::shared_ptr<MemoryRegion>>& regions) : MemoryRegion{TYPE_PMA_ROM, 0, 0x200, true, false}, regions{regions} {}
+        MemoryPMARom(std::vector<std::shared_ptr<MemoryRegion>>& regions) : MemoryRegion{TYPE_PMA_ROM, 0, 0, 0x200, true, false}, regions{regions} {}
 
-        Word ReadWord(Address address) const override {
-            address >>= 2;
+        Long ReadLong(Address address) const override {
+            address >>= 3;
             auto index = address >> 2;
             if (index >= regions.size()) return 0;
 
@@ -157,7 +160,7 @@ private:
 
         void Lock() const override {}
         void Unlock() const override {}
-        size_t SizeInMemory() const { return sizeof(std::vector<std::shared_ptr<MemoryRegion>>&); }
+        Long SizeInMemory() const { return sizeof(std::vector<std::shared_ptr<MemoryRegion>>&); }
     };
 public:
     Memory() {
@@ -172,32 +175,54 @@ public:
     Memory& operator=(const Memory&) = delete;
     Memory& operator=(Memory&&) = delete;
 
+    Long ReadLong(Address address) const;
     Word ReadWord(Address address) const;
     Half ReadHalf(Address address) const;
     Byte ReadByte(Address address) const;
 
+    std::pair<Long, bool> PeekLong(Address address) const;
     std::pair<Word, bool> PeekWord(Address address) const;
+    bool TryWriteLong(Address address, Long vlong);
     bool TryWriteWord(Address address, Word word);
 
+    void WriteLong(Address address, Long vlong);
     void WriteWord(Address address, Word word);
     void WriteHalf(Address address, Half half);
     void WriteByte(Address address, Byte byte);
 
-    Word AtomicSwap(Address address, Word word);
-    Word AtomicAdd(Address address, Word word);
-    Word AtomicAnd(Address address, Word word);
-    Word AtomicOr(Address address, Word word);
-    Word AtomicXor(Address address, Word word);
-    SWord AtomicMin(Address address, SWord word);
-    Word AtomicMinU(Address address, Word word);
-    SWord AtomicMax(Address address, SWord word);
-    Word AtomicMaxU(Address address, Word word);
+    Long AtomicSwapL(Address address, Long vlong);
+    Long AtomicAddL(Address address, Long vlong);
+    Long AtomicAndL(Address address, Long vlong);
+    Long AtomicOrL(Address address, Long vlong);
+    Long AtomicXorL(Address address, Long vlong);
+    SLong AtomicMinL(Address address, SLong vlong);
+    Long AtomicMinUL(Address address, Long vlong);
+    SLong AtomicMaxL(Address address, SLong vlong);
+    Long AtomicMaxUL(Address address, Long vlong);
 
+    Word AtomicSwapW(Address address, Word word);
+    Word AtomicAddW(Address address, Word word);
+    Word AtomicAndW(Address address, Word word);
+    Word AtomicOrW(Address address, Word word);
+    Word AtomicXorW(Address address, Word word);
+    SWord AtomicMinW(Address address, SWord word);
+    Word AtomicMinUW(Address address, Word word);
+    SWord AtomicMaxW(Address address, SWord word);
+    Word AtomicMaxUW(Address address, Word word);
+
+    void WriteLongs(Address address, const std::vector<Long>& longs);
     void WriteWords(Address address, const std::vector<Word>& words);
+
+    std::vector<Long> ReadLongs(Address address, Address const) const;
     std::vector<Word> ReadWords(Address address, Address count) const;
+
+    std::vector<std::pair<Long, bool>> PeekLongs(Address address, Address cont) const;
     std::vector<std::pair<Word, bool>> PeekWords(Address address, Address count) const;
 
+    Long ReadLongReserved(Address address, Hart hart_id) const;
     Word ReadWordReserved(Address address, Hart hart_id) const;
+
+    bool WriteLongConditional(Address address, Long vlong, Hart hart_id);
     bool WriteWordConditional(Address address, Word word, Hart hart_id);
 
     Address ReadFileInto(const std::string& path, Address address);

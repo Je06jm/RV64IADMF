@@ -20,30 +20,43 @@ class VirtualMachine {
 public:
     static constexpr size_t REGISTER_COUNT = 32;
 
+    union Reg {
+        struct {
+            Word u32;
+            Word is_u64;
+        };
+        struct {
+            SWord s32;
+            SWord _unused;
+        };
+        Long u64;
+        SLong s64;
+    };
+
 private:
     static constexpr Byte MACHINE_MODE = 0b11;
     static constexpr Byte SUPERVISOR_MODE = 0b01;
     static constexpr Byte USER_MODE = 0b00;
 
-    static constexpr Word ISA_BITS_MASK = 0b11 << 30;
-    static constexpr Word ISA_32_BITS = 1 << 30;
+    static constexpr Long ISA_BITS_MASK = 0b11 << 30;
+    static constexpr Long ISA_64_BITS = 1ULL << 63;
 
-    static constexpr Word ISA_A = 1<<0;
-    static constexpr Word ISA_D = 1<<3;
-    static constexpr Word ISA_F = 1<<5;
-    static constexpr Word ISA_I = 1<<8;
-    static constexpr Word ISA_M = 1<<12;
-    static constexpr Word ISA_S = 1<<18;
-    static constexpr Word ISA_U = 1<<20;
+    static constexpr Long ISA_A = 1<<0;
+    static constexpr Long ISA_D = 1<<3;
+    static constexpr Long ISA_F = 1<<5;
+    static constexpr Long ISA_I = 1<<8;
+    static constexpr Long ISA_M = 1<<12;
+    static constexpr Long ISA_S = 1<<18;
+    static constexpr Long ISA_U = 1<<20;
 
-    std::array<Word, REGISTER_COUNT> regs;
+    std::array<Reg, REGISTER_COUNT> regs;
     std::array<Float, REGISTER_COUNT> fregs;
 
-    std::unordered_map<Word, Word> csrs;
+    std::unordered_map<Long, Long> csrs;
 
-    bool CSRPrivilegeCheck(Word csr);
-    Word ReadCSR(Word csr, bool is_internal_read = false);
-    void WriteCSR(Word csr, Word value);
+    bool CSRPrivilegeCheck(Long csr);
+    Long ReadCSR(Long csr, bool is_internal_read = false);
+    void WriteCSR(Long csr, Long value);
 
     static const int default_rounding_mode;
     bool ChangeRoundingMode(Byte rm = 0xff);
@@ -54,13 +67,13 @@ public:
     static constexpr Half CSR_FRM = 0x002;
     static constexpr Half CSR_FCSR = 0x003;
 
-    static constexpr Word CSR_FCSR_NV = 0b10000;
-    static constexpr Word CSR_FCSR_DZ = 0b1000;
-    static constexpr Word CSR_FCSR_OF = 0b100;
-    static constexpr Word CSR_FCSR_UF = 0b10;
-    static constexpr Word CSR_FCSR_NX = 0b1;
+    static constexpr Long CSR_FCSR_NV = 0b10000;
+    static constexpr Long CSR_FCSR_DZ = 0b1000;
+    static constexpr Long CSR_FCSR_OF = 0b100;
+    static constexpr Long CSR_FCSR_UF = 0b10;
+    static constexpr Long CSR_FCSR_NX = 0b1;
 
-    static constexpr Word CSR_FCSR_FLAGS = 0b11111;
+    static constexpr Long CSR_FCSR_FLAGS = 0b11111;
     
     static constexpr Half CSR_CYCLE = 0xc00;
     static constexpr Half CSR_TIME = 0xc01;
@@ -128,33 +141,33 @@ public:
     static constexpr Half CSR_PERFORMANCE_EVENT_MAX = 32;
     static constexpr Half CSR_MHPMEVENT3 = 0x323;
 
-    static constexpr Word MSTATUS_WRITABLE_BITS = 0b00000000000011100111100110101010;
+    static constexpr Long MSTATUS_WRITABLE_BITS = 0b00000000000011100111100110101010;
 
     union MStatus {
         struct {
-            Word _unused0 : 1;
-            Word SIE : 1;
-            Word _unused1 : 1;
-            Word MIE : 1;
-            Word _unused2 : 1;
-            Word SPIE : 1;
-            Word _unused3 : 1;
-            Word MPIE : 1;
-            Word SPP : 1;
-            Word _unused4 : 2;
-            Word MPP : 2;
-            Word FS : 2;
-            Word _unused5 : 2;
-            Word MPRIV : 1;
-            Word SUM : 1;
-            Word MXR : 1;
-            Word _unused6 : 1;
-            Word _unused7 : 1;
-            Word _unused8 : 1;
-            Word _unused9 : 8;
-            Word SD : 1;
+            Long _unused0 : 1;
+            Long SIE : 1;
+            Long _unused1 : 1;
+            Long MIE : 1;
+            Long _unused2 : 1;
+            Long SPIE : 1;
+            Long _unused3 : 1;
+            Long MPIE : 1;
+            Long SPP : 1;
+            Long _unused4 : 2;
+            Long MPP : 2;
+            Long FS : 2;
+            Long _unused5 : 2;
+            Long MPRIV : 1;
+            Long SUM : 1;
+            Long MXR : 1;
+            Long _unused6 : 1;
+            Long _unused7 : 1;
+            Long _unused8 : 1;
+            Long _unused9 : 8;
+            Long SD : 1;
         };
-        Word raw;
+        Long raw;
     };
 
     static constexpr Byte FS_OFF = 0;
@@ -172,28 +185,32 @@ public:
         csrs[CSR_MSTATUS] = mstatus.raw;
     }
 
-    static constexpr Word SSTATUS_WRITABLE_BITS = 0b00000000000011000110000100100010;
+    inline bool Is32BitMode() const {
+        return false;
+    }
+
+    static constexpr Long SSTATUS_WRITABLE_BITS = 0b00000000000011000110000100100010;
 
     union SStatus {
         struct {
-            Word _unused0 : 1;
-            Word SIE : 1;
-            Word _unused1 : 3;
-            Word SPIE : 1;
-            Word _unused2 : 1;
-            Word _unused3 : 1;
-            Word SPP : 1;
-            Word _unused4 : 2;
-            Word _unused5 : 2;
-            Word FS : 2;
-            Word _unused6 : 2;
-            Word _unused7 : 1;
-            Word SUM : 1;
-            Word MXR : 1;
-            Word _unused8 : 11;
-            Word SD : 1;
+            Long _unused0 : 1;
+            Long SIE : 1;
+            Long _unused1 : 3;
+            Long SPIE : 1;
+            Long _unused2 : 1;
+            Long _unused3 : 1;
+            Long SPP : 1;
+            Long _unused4 : 2;
+            Long _unused5 : 2;
+            Long FS : 2;
+            Long _unused6 : 2;
+            Long _unused7 : 1;
+            Long SUM : 1;
+            Long MXR : 1;
+            Long _unused8 : 11;
+            Long SD : 1;
         };
-        Word raw;
+        Long raw;
     };
     inline SStatus ReadSStatus() const {
         SStatus sstatus;
@@ -281,37 +298,37 @@ public:
 
     union TLBEntry {
         struct {
-            Word V : 1;
-            Word R : 1;
-            Word W : 1;
-            Word X : 1;
-            Word U : 1;
-            Word G : 1;
-            Word A : 1;
-            Word D : 1;
-            Word RSW : 2;
-            Word PPN_0 : 10;
-            Word PPN_1 : 12;
+            Long V : 1;
+            Long R : 1;
+            Long W : 1;
+            Long X : 1;
+            Long U : 1;
+            Long G : 1;
+            Long A : 1;
+            Long D : 1;
+            Long RSW : 2;
+            Long PPN_0 : 10;
+            Long PPN_1 : 12;
         };
         struct {
-            Word _unused : 10;
-            Word PPN : 22;
+            Long _unused : 10;
+            Long PPN : 22;
         };
-        Word raw;
+        Long raw;
 
         inline bool IsLeaf() const {
             return X || W || R;
         }
     };
 
-    static constexpr Word INTERRUPT_SUPERVISOR_SOFTWARE = 0x1;
-    static constexpr Word INTERRUPT_MACHINE_SOFTWARE = 0x3;
-    static constexpr Word INTERRUPT_SUPERVISOR_TIMER = 0x5;
-    static constexpr Word INTERRUPT_MACHINE_TIMER = 0x7;
-    static constexpr Word INTERRUPT_SUPERVISOR_EXTERNAL = 0x9;
-    static constexpr Word INTERRUPT_MACHINE_EXTERNAL = 0xa;
+    static constexpr Long INTERRUPT_SUPERVISOR_SOFTWARE = 0x1;
+    static constexpr Long INTERRUPT_MACHINE_SOFTWARE = 0x3;
+    static constexpr Long INTERRUPT_SUPERVISOR_TIMER = 0x5;
+    static constexpr Long INTERRUPT_MACHINE_TIMER = 0x7;
+    static constexpr Long INTERRUPT_SUPERVISOR_EXTERNAL = 0x9;
+    static constexpr Long INTERRUPT_MACHINE_EXTERNAL = 0xa;
 
-    void RaiseInterrupt(Word cause);
+    void RaiseInterrupt(Long cause);
 
 private:
     bool waiting_for_interrupt = false;
@@ -322,42 +339,42 @@ public:
     }
 
 private:
-    static constexpr Word TRAP_INTERRUPT_BIT = (1ULL << 31);
+    static constexpr Long TRAP_INTERRUPT_BIT = (1ULL << 31);
 
-    static constexpr Word EXCEPTION_INSTRUCTION_ADDRESS_MISALIGNED = 0x0;
-    static constexpr Word EXCEPTION_INSTRUCTION_ADDRESS_FAULT = 0x1;
-    static constexpr Word EXCEPTION_ILLEGAL_INSTRUCTION = 0x2;
-    static constexpr Word EXCEPTION_BREAKPOINT = 0x3;
-    static constexpr Word EXCEPTION_LOAD_ADDRESS_MISALIGNED = 0x4;
-    static constexpr Word EXCEPTION_LOAD_ACCESS_FAULT = 0x5;
-    static constexpr Word EXCEPTION_STORE_AMO_ADDRESS_MISALIGNED = 0x6;
-    static constexpr Word EXCEPTION_STORE_AMO_ACCESS_FAULT = 0x7;
-    static constexpr Word EXCEPTION_ENVIRONMENT_CALL_FROM_U_MODE = 0x8;
-    static constexpr Word EXCEPTION_ENVIRONMENT_CALL_FROM_S_MODE = 0x9;
-    static constexpr Word EXCEPTION_ENVIRONMENT_CALL_FROM_M_MODE = 0xb;
-    static constexpr Word EXCEPTION_INSTRUCTION_PAGE_FAULT = 0xc;
-    static constexpr Word EXCEPTION_INSTRUCTION_LOAD_PAGE_FAULT = 0xd;
-    static constexpr Word EXCEPTION_STORE_AMO_PAGE_FAULT = 0xf;
+    static constexpr Long EXCEPTION_INSTRUCTION_ADDRESS_MISALIGNED = 0x0;
+    static constexpr Long EXCEPTION_INSTRUCTION_ADDRESS_FAULT = 0x1;
+    static constexpr Long EXCEPTION_ILLEGAL_INSTRUCTION = 0x2;
+    static constexpr Long EXCEPTION_BREAKPOINT = 0x3;
+    static constexpr Long EXCEPTION_LOAD_ADDRESS_MISALIGNED = 0x4;
+    static constexpr Long EXCEPTION_LOAD_ACCESS_FAULT = 0x5;
+    static constexpr Long EXCEPTION_STORE_AMO_ADDRESS_MISALIGNED = 0x6;
+    static constexpr Long EXCEPTION_STORE_AMO_ACCESS_FAULT = 0x7;
+    static constexpr Long EXCEPTION_ENVIRONMENT_CALL_FROM_U_MODE = 0x8;
+    static constexpr Long EXCEPTION_ENVIRONMENT_CALL_FROM_S_MODE = 0x9;
+    static constexpr Long EXCEPTION_ENVIRONMENT_CALL_FROM_M_MODE = 0xb;
+    static constexpr Long EXCEPTION_INSTRUCTION_PAGE_FAULT = 0xc;
+    static constexpr Long EXCEPTION_INSTRUCTION_LOAD_PAGE_FAULT = 0xd;
+    static constexpr Long EXCEPTION_STORE_AMO_PAGE_FAULT = 0xf;
 
-    void RaiseException(Word cause);
+    void RaiseException(Long cause);
 
-    static constexpr Word VALID_INTERRUPT_BITS = 0b0;
+    static constexpr Long VALID_INTERRUPT_BITS = 0b0;
 
-    Word mip = 0;
-    Word mie = 0;
-    Word mideleg = 0;
-    Word sip = 0;
-    Word sie = 0;
+    Long mip = 0;
+    Long mie = 0;
+    Long mideleg = 0;
+    Long sip = 0;
+    Long sie = 0;
 
-    void RaiseMachineTrap(Word cause);
-    void RaiseSupervisorTrap(Word cause);
+    void RaiseMachineTrap(Long cause);
+    void RaiseSupervisorTrap(Long cause);
     
     MStatus mstatus;
     SStatus sstatus;
 
     struct TLBCacheEntry {
-        Word tag : 31;
-        Word super : 1;
+        Long tag : 63;
+        Long super : 1;
         
         TLBEntry tlb_entry;
 
@@ -367,13 +384,13 @@ private:
     static constexpr size_t TLB_CACHE_SIZE = 16;
     
     inline static consteval auto GetLog2(auto value) {
-        auto i = 0;
+        Long i = 0;
         while ((1ULL << i) < value) i++;
         return i;
     }
 
 public:
-    std::pair<TLBEntry, bool> GetTLBLookup(Word phys_addr, bool bypass_cache = false, bool is_amo = false);
+    std::pair<TLBEntry, bool> GetTLBLookup(Address phys_addr, bool bypass_cache = false, bool is_amo = false);
 
 private:
     size_t tlb_cache_round_robin = 0;
@@ -383,11 +400,11 @@ private:
 
     union SATP {
         struct {
-            Word PPN : 22;
-            Word ASID : 9;
-            Word MODE : 1;
+            Long PPN : 22;
+            Long ASID : 9;
+            Long MODE : 1;
         };
-        Word raw;
+        Long raw;
     };
 
     SATP satp;
@@ -397,31 +414,31 @@ public:
         return (privilege_level != PrivilegeLevel::Machine) && (satp.MODE != 0);
     }
 
-    inline Word GetPendingMachineInterrupts() const {
+    inline Long GetPendingMachineInterrupts() const {
         return mip;
     }
 
-    inline Word GetEnabledMachineInterrupts() const {
+    inline Long GetEnabledMachineInterrupts() const {
         return mie;
     }
 
-    inline Word GetDelegatedMachineInterrupts() const {
+    inline Long GetDelegatedMachineInterrupts() const {
         return mideleg;
     }
 
-    inline Word GetPendingSupervisorInterrupts() const {
+    inline Long GetPendingSupervisorInterrupts() const {
         return sip;
     }
 
-    inline Word GetEnabledSupervisorInterrupts() const {
+    inline Long GetEnabledSupervisorInterrupts() const {
         return sie;
     }
 
 private:
     std::pair<Address, bool> TranslateMemoryAddress(Address address, bool is_write, bool is_execute, bool is_amo = false);
 
-    Word pc;
-    uint64_t cycles;
+    Long pc;
+    Long cycles;
 
     bool running = false;
     bool paused = false;
@@ -429,11 +446,11 @@ private:
     bool pause_on_restart = false;
     std::string err = "";
 
-    std::set<Word> break_points;
+    std::set<Long> break_points;
 
-    Word ticks;
+    Long ticks;
     std::vector<double> history_delta;
-    std::vector<Word> history_tick;
+    std::vector<Long> history_tick;
 
     static constexpr size_t MAX_HISTORY = 15;
 
@@ -441,11 +458,11 @@ private:
 
     class CSRMappedMemory : public MemoryRegion {
     public:
-        static constexpr uint64_t TICKS_PER_SECOND = 32768;
-        uint64_t time = 0;
-        uint64_t time_cmp = -1ULL;
+        static constexpr Long TICKS_PER_SECOND = 32768;
+        Long time = 0;
+        Long time_cmp = -1ULL;
 
-        CSRMappedMemory() : MemoryRegion{TYPE_MAPPED_CSRS, 0Xf00, 0x100, true, true} {}
+        CSRMappedMemory() : MemoryRegion{TYPE_MAPPED_CSRS, 0,  0Xf00, 0x100, true, true} {}
 
         Word ReadWord(Address address) const override {
             address >>= 2;
@@ -474,13 +491,13 @@ private:
     std::shared_ptr<CSRMappedMemory> csr_mapped_memory;
 
 public:
-    VirtualMachine(Memory& memory, Word starting_pc, Word hart_id);
+    VirtualMachine(Memory& memory, Long starting_pc, Hart hart_id);
     VirtualMachine(const VirtualMachine&) = delete;
     VirtualMachine(VirtualMachine&&);
     ~VirtualMachine();
     
     inline void Start() { running = true; }
-    inline void Restart(Word pc, Word source_hart) {
+    inline void Restart(Long pc, Hart source_hart) {
         this->pc = pc;
 
         if (source_hart == csrs[CSR_MHARTID])
@@ -502,20 +519,20 @@ public:
     inline void SetPauseOnRestart(bool pause_on_restart) { this->pause_on_restart = pause_on_restart; }
     inline bool PauseOnRestart() const { return pause_on_restart; }
 
-    bool Step(Word steps = 1000);
+    bool Step(Long steps = 1000);
     void Run();
 
-    inline void SetPC(Word pc) { this->pc = pc; }
+    inline void SetPC(Long pc) { this->pc = pc; }
 
-    void GetSnapshot(std::array<Word, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, Word& pc);
-    void GetCSRSnapshot(std::unordered_map<Word, Word>& csrs) const;
+    void GetSnapshot(std::array<Reg, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, Long& pc);
+    void GetCSRSnapshot(std::unordered_map<Long, Long>& csrs) const;
 
-    inline Word GetPC() const {
+    inline Long GetPC() const {
         return pc;
     }
 
-    inline Word GetSP() const {
-        return regs[REG_SP];
+    inline Long GetSP() const {
+        return regs[REG_SP].u64;
     }
 
     size_t GetInstructionsPerSecond();
@@ -533,15 +550,15 @@ public:
 
     void UpdateTime(double delta_time);
 
-    using ECallHandler = std::function<void(Word hart, Memory& memory, std::array<Word, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>& fregs)>;
+    using ECallHandler = std::function<void(Hart, bool, Memory& memory, std::array<Reg, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>& fregs)>;
 
 private:
-    static void EmptyECallHandler(Word hart, Memory& memory, std::array<Word, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&);
+    static void EmptyECallHandler(Hart hart, bool is_32_bit_mode, Memory& memory, std::array<Reg, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&);
 
-    static std::unordered_map<Word, ECallHandler> ecall_handlers;
+    static std::unordered_map<Long, ECallHandler> ecall_handlers;
 
 public:
-    inline static void RegisterECall(Word handler_index, ECallHandler handler) {
+    inline static void RegisterECall(Long handler_index, ECallHandler handler) {
         ecall_handlers[handler_index] = handler;
     }
 };

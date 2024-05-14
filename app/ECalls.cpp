@@ -11,13 +11,21 @@
 #include <cstdlib>
 
 using VM = VirtualMachine;
-using Regs = std::array<Word, VM::REGISTER_COUNT>;
+using Regs = std::array<VM::Reg, VM::REGISTER_COUNT>;
 using FRegs = std::array<Float, VM::REGISTER_COUNT>;
 
-void ECallCOut(Hart, Memory& memory, Regs& regs, FRegs&) {
+void ECallCOut(Hart, bool is_32_bit_mode, Memory& memory, Regs& regs, FRegs&) {
     std::string str = "";
 
-    for (Address addr = regs[VM::REG_A1], i = 0; i < regs[VM::REG_A2]; addr++, i++) {
+    Address addr;
+    if (is_32_bit_mode) addr = regs[VM::REG_A1].u32;
+    else addr = regs[VM::REG_A1].u64;
+
+    Address size;
+    if (is_32_bit_mode) size = regs[VM::REG_A2].u32;
+    else size = regs[VM::REG_A2].u64;
+
+    for (Address i = 0; i < size; addr++, i++) {
         Byte byte = memory.ReadByte(addr);
         str += static_cast<char>(byte);
     }
@@ -25,62 +33,101 @@ void ECallCOut(Hart, Memory& memory, Regs& regs, FRegs&) {
     std::cout << str << std::flush;
 }
 
-void ECallCIn(Hart, Memory& memory, Regs& regs, FRegs&) {
+void ECallCIn(Hart, bool is_32_bit_mode, Memory& memory, Regs& regs, FRegs&) {
     std::string str = "";
 
     if (!std::getline(std::cin, str)) {
-        regs[VM::REG_A0] = 0;
+        if (is_32_bit_mode) regs[VM::REG_A0].u32 = 0;
+        else regs[VM::REG_A0].u64 = 0;
         return;
     }
 
     Address i, addr;
-    for (i = 0, addr = regs[VM::REG_A1]; i < str.size() && i < regs[VM::REG_A2] && addr < memory.GetTotalMemory(); i++, addr++) {
+
+    if (is_32_bit_mode) addr = regs[VM::REG_A1].u32;
+    else addr = regs[VM::REG_A1].u64;
+
+    Address size;
+
+    if (is_32_bit_mode) size = regs[VM::REG_A2].u32;
+    else size = regs[VM::REG_A2].u64;
+
+    for (i = 0, addr = addr; i < str.size() && i < size && addr < memory.GetTotalMemory(); i++, addr++) {
         memory.WriteByte(addr, str[i]);
     }
 
-    regs[VM::REG_A0] = i;
+    if (is_32_bit_mode) regs[VM::REG_A0].u32 = static_cast<uint32_t>(i);
+    else regs[VM::REG_A0].u64 = i;
 }
 
-void ECallStartCPU(Hart hart, Memory&, Regs& regs, FRegs&) {
-    Hart target_hart = regs[VM::REG_A1];
+void ECallStartCPU(Hart hart, bool is_32_bit_mode, Memory&, Regs& regs, FRegs&) {
+    Hart target_hart;
+
+    if (is_32_bit_mode) target_hart = regs[VM::REG_A1].u32;
+    else target_hart = regs[VM::REG_A1].u64;
+    
     if (target_hart > vms.size()) {
-        std::cerr << std::format("Unknown hart {}", regs[target_hart]) << std::endl;
+        std::cerr << std::format("Unknown hart {}", target_hart) << std::endl;
         std::exit(EXIT_FAILURE);
     }
 
-    vms[target_hart]->Restart(regs[VM::REG_A2], hart);
+    Address start;
+
+    if (is_32_bit_mode) start = regs[VM::REG_A2].u32;
+    else start = regs[VM::REG_A2].u64;
+
+    vms[target_hart]->Restart(start, hart);
 }
 
-void ECallGetCPUs(Hart, Memory& memory, Regs& regs, FRegs&) {
-    if (regs[VM::REG_A1] != 0) {
-        for (Word i = 0; i < vms.size(); i++)
-            memory.WriteWord(regs[VM::REG_A1] + i * sizeof(Word), i);
+void ECallGetCPUs(Hart, bool is_32_bit_mode, Memory& memory, Regs& regs, FRegs&) {
+    Address address;
+
+    if (is_32_bit_mode) address = regs[VM::REG_A1].u32;
+    else address = regs[VM::REG_A1].u64;
+
+    if (address != 0) {
+        for (Long i = 0; i < vms.size(); i++)
+            memory.WriteWord(address + i * sizeof(Hart), i);
     }
 
-    regs[VM::REG_A0] = static_cast<Word>(vms.size());
+    if (is_32_bit_mode) regs[VM::REG_A0].u32 = static_cast<Word>(vms.size());
+    else regs[VM::REG_A0].u64 = static_cast<Long>(vms.size());
 }
 
-void ECallGetScreenAddress(Hart, Memory&, Regs& regs, FRegs&) {
-    regs[VM::REG_A0] = framebuffer_address;
+void ECallGetScreenAddress(Hart, bool is_32_bit_mode, Memory&, Regs& regs, FRegs&) {
+    if (is_32_bit_mode) regs[VM::REG_A0].u32 = static_cast<Word>(framebuffer_address);
+    else regs[VM::REG_A0].u64 = framebuffer_address;
 }
 
-void ECallGetScreenSize(Hart, Memory& memory, Regs& regs, FRegs&) {
-    memory.WriteWord(static_cast<Address>(regs[VM::REG_A1]), framebuffer_width);
-    memory.WriteWord(static_cast<Address>(regs[VM::REG_A2]), framebuffer_height);
+void ECallGetScreenSize(Hart, bool is_32_bit_mode, Memory& memory, Regs& regs, FRegs&) {
+    Address width_address, height_address;
+    
+    if (is_32_bit_mode) {
+        width_address = regs[VM::REG_A1].u32;
+        height_address = regs[VM::REG_A2].u32;
+    }
+    else {
+        width_address = regs[VM::REG_A1].u64;
+        height_address = regs[VM::REG_A2].u64;
+    }
+
+    memory.WriteWord(static_cast<Address>(width_address), framebuffer_width);
+    memory.WriteWord(static_cast<Address>(height_address), framebuffer_height);
 }
 
-void ECallGetMemorySize(Hart, Memory& memory, Regs& regs, FRegs&) {
-    regs[VM::REG_A0] = memory.GetTotalMemory();
+void ECallGetMemorySize(Hart, bool is_32_bit_mode, Memory& memory, Regs& regs, FRegs&) {
+    if (is_32_bit_mode) regs[VM::REG_A0].u32 = static_cast<Word>(memory.GetTotalMemory());
+    else regs[VM::REG_A0].u64 = memory.GetTotalMemory();
 }
 
-void ECallExit(Hart, Memory&, Regs& regs, FRegs&) {
+void ECallExit(Hart, bool, Memory&, Regs& regs, FRegs&) {
     union S32U32 {
         Word u;
         SWord s;
     };
 
     S32U32 value;
-    value.u = regs[VM::REG_A1];
+    value.u = regs[VM::REG_A1].u32;
     std::exit(value.s);
 }
 

@@ -17,6 +17,6 @@ using SWord = int32_t;
 using SHalf = int16_t;
 using SByte = int8_t;
 
-using Hart = uint32_t;
+using Hart = uint64_t;
 
 #endif

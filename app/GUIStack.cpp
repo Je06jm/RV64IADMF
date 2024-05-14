@@ -27,22 +27,46 @@ void GUIStack::Draw() {
 
         Address window_pc = static_cast<Address>(window_begin) << 2;
 
-        auto values = memory.PeekWords(window_pc, WINDOW);
+        if (vm->Is32BitMode()) {
+            auto values = memory.PeekWords(window_pc, WINDOW);
 
-        for (Address addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
-            if (values[i].second) {
-                if (addr == sp) {
-                    ImGui::TextColored(gui_sp_highlight_color, "-> 0x%08x : 0x%08x (%i)", addr, values[i].first, values[i].first);
-                } else {
-                    ImGui::Text("   0x%08x : 0x%08x (%i)", addr, values[i].first, values[i].first);
+            for (Address addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
+                if (values[i].second) {
+                    if (addr == sp) {
+                        ImGui::TextColored(gui_sp_highlight_color, "-> 0x%08x : 0x%08x (%i)", addr, values[i].first, values[i].first);
+                    } else {
+                        ImGui::Text("   0x%08x : 0x%08x (%i)", addr, values[i].first, values[i].first);
+                    }
+                }
+                else {
+                    if (addr == sp)
+                        ImGui::TextColored(gui_sp_highlight_color, "-> Unmapped memory");
+                    
+                    else
+                        ImGui::Text("   Unmapped memory");
                 }
             }
-            else {
-                if (addr == sp)
-                    ImGui::TextColored(gui_sp_highlight_color, "-> Unmapped memory");
-                
-                else
-                    ImGui::Text("   Unmapped memory");
+        }
+        else {
+            auto values = memory.PeekLongs(window_pc, WINDOW);
+
+            for (Address addr = window_pc, i = 0; i < WINDOW; addr += 8, i++) {
+                auto str = std::format("{} 0x{:0>16x} : 0x{:0>16x} ({})",  addr == sp ? "->" : "  ", addr, values[i].first, values[i].first);
+
+                if (values[i].second) {
+                    if (addr == sp) {
+                        ImGui::TextColored(gui_sp_highlight_color, "%s", str.c_str());
+                    } else {
+                        ImGui::Text("%s", str.c_str());
+                    }
+                }
+                else {
+                    if (addr == sp)
+                        ImGui::TextColored(gui_sp_highlight_color, "-> Unmapped memory");
+                    
+                    else
+                        ImGui::Text("   Unmapped memory");
+                }
             }
         }
     }

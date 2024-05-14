@@ -17,7 +17,7 @@
 
 const int VirtualMachine::default_rounding_mode = fegetround();
 
-bool VirtualMachine::CSRPrivilegeCheck(Word csr) {
+bool VirtualMachine::CSRPrivilegeCheck(Long csr) {
     if (csr < 4 || (csr >= 0xc00 && csr < 0xcf0))
         return true;
     
@@ -27,7 +27,7 @@ bool VirtualMachine::CSRPrivilegeCheck(Word csr) {
     return privilege_level == PrivilegeLevel::Machine;
 }
 
-Word VirtualMachine::ReadCSR(Word csr, bool is_internal_read) {
+Long VirtualMachine::ReadCSR(Long csr, bool is_internal_read) {
     if (!is_internal_read && !CSRPrivilegeCheck(csr)) {
         RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
         return 0;
@@ -45,17 +45,10 @@ Word VirtualMachine::ReadCSR(Word csr, bool is_internal_read) {
     switch (csr) {
         case CSR_MCYCLE:
         case CSR_CYCLE:
-            return static_cast<Word>(cycles);
-        
-        case CSR_MCYCLEH:
-        case CSR_CYCLEH:
-            return static_cast<Word>(cycles >> 32);
+            return static_cast<Long>(cycles);
         
         case CSR_TIME:
-            return static_cast<Word>(csr_mapped_memory->time);
-        
-        case CSR_TIMEH:
-            return static_cast<Word>(csr_mapped_memory->time >> 32);
+            return static_cast<Long>(csr_mapped_memory->time);
 
         case CSR_MSTATUS:
             mstatus.SD = mstatus.FS == FS_DIRTY;
@@ -106,7 +99,7 @@ Word VirtualMachine::ReadCSR(Word csr, bool is_internal_read) {
     return csrs[csr];
 }
 
-void VirtualMachine::WriteCSR(Word csr, Word value) {
+void VirtualMachine::WriteCSR(Long csr, Long value) {
     if (!CSRPrivilegeCheck(csr)) {
         RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
         return;
@@ -121,10 +114,7 @@ void VirtualMachine::WriteCSR(Word csr, Word value) {
         case CSR_MINSTRET:
         case CSR_MINSTRETH:
         case CSR_CYCLE:
-        case CSR_CYCLEH:
         case CSR_TIME:
-        case CSR_TIMEH:
-        case CSR_MSTATUSH:
         case CSR_MCOUNTEREN:
         case CSR_MCOUNTINHIBIT:
         case CSR_MENVCFG:
@@ -236,7 +226,7 @@ bool VirtualMachine::CheckFloatErrors() {
     return false;
 }
 
-void VirtualMachine::RaiseInterrupt(Word cause) {
+void VirtualMachine::RaiseInterrupt(Long cause) {
     auto cause_bit = 1ULL << cause;
 
     static std::mutex lock;
@@ -245,7 +235,7 @@ void VirtualMachine::RaiseInterrupt(Word cause) {
     lock.unlock();
 }
 
-void VirtualMachine::RaiseException(Word cause) {
+void VirtualMachine::RaiseException(Long cause) {
     auto cause_bit = 1ULL << cause;
 
     auto delegate = csrs[CSR_MEDELEG];
@@ -258,7 +248,7 @@ void VirtualMachine::RaiseException(Word cause) {
     
 }
 
-void VirtualMachine::RaiseMachineTrap(Word cause) {
+void VirtualMachine::RaiseMachineTrap(Long cause) {
     auto handler_address = csrs[CSR_MTVEC];
 
     auto mode = handler_address & 0b11;
@@ -302,7 +292,7 @@ void VirtualMachine::RaiseMachineTrap(Word cause) {
     privilege_level = PrivilegeLevel::Machine;
 }
 
-void VirtualMachine::RaiseSupervisorTrap(Word cause) {
+void VirtualMachine::RaiseSupervisorTrap(Long cause) {
     auto [handler_address, valid] = TranslateMemoryAddress(csrs[CSR_STVEC], false, false);
 
     if (!valid) return;
@@ -345,7 +335,8 @@ void VirtualMachine::RaiseSupervisorTrap(Word cause) {
     privilege_level = PrivilegeLevel::Supervisor;
 }
 
-std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(Word virt_addr, bool bypass_cache, bool is_amo) {
+std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(Address virt_addr, bool bypass_cache, bool is_amo) {
+    // TODO Fix this!
     constexpr auto KB_OFFSET_BITS = GetLog2(0x1000);
     constexpr auto MB_OFFSET_BITS = GetLog2(0x200000);
 
@@ -509,12 +500,11 @@ std::pair<Address, bool> VirtualMachine::TranslateMemoryAddress(Address address,
 
 void VirtualMachine::Setup() {
     for (auto& r : regs) {
-        r = 0;
+        r.u64 = 0;
     }
 
     for (auto& f : fregs) {
-        f.f = 0.0;
-        f.is_double = false;
+        f.d = 0.0;
     }
 
     // User
@@ -558,7 +548,7 @@ void VirtualMachine::Setup() {
     cycles = 0;
 }
 
-VirtualMachine::VirtualMachine(Memory& memory, Word starting_pc, Word hart_id) : memory{memory}, pc{starting_pc} {
+VirtualMachine::VirtualMachine(Memory& memory, Address starting_pc, Address hart_id) : memory{memory}, pc{starting_pc} {
     csrs[CSR_MVENDORID] = 0;
 
     csrs[CSR_MARCHID] = ('E' << 24) | ('N' << 16) | ('I' << 8) | ('H');
@@ -566,7 +556,7 @@ VirtualMachine::VirtualMachine(Memory& memory, Word starting_pc, Word hart_id) :
 
     csrs[CSR_MHARTID] = hart_id;
 
-    csrs[CSR_MISA] = ISA_32_BITS | ISA_A | ISA_D | ISA_F | ISA_I | ISA_M;
+    csrs[CSR_MISA] = ISA_64_BITS | ISA_A | ISA_D | ISA_F | ISA_I | ISA_M;
 
     csr_mapped_memory = std::make_shared<CSRMappedMemory>();
     memory.AddMemoryRegion(csr_mapped_memory);
@@ -604,14 +594,14 @@ VirtualMachine::~VirtualMachine() {
     running = false;
 }
 
-bool VirtualMachine::Step(Word steps) {
-    auto SignExtend = [](Word value, Word bit) {
-        Word sign = -1U << bit;
-        if (value & (1U << bit)) return value | sign;
+bool VirtualMachine::Step(Long steps) {
+    auto SignExtend = [](Long value, Long bit) {
+        Long sign = -1ULL << bit;
+        if (value & (1ULL << bit)) return value | sign;
         return value;
     };
 
-    auto AsSigned = [](Word value) {
+    auto AsSigned32 = [](Word value) {
         union S32U32 {
             Word u;
             SWord s;
@@ -622,13 +612,35 @@ bool VirtualMachine::Step(Word steps) {
         return v.s;
     };
 
-    auto AsUnsigned = [](SWord value) {
+    auto AsUnsigned32 = [](SWord value) {
         union S32U32 {
             Word u;
             SWord s;
         };
 
         S32U32 v;
+        v.s = value;
+        return v.u;
+    };
+
+    auto AsSigned64 = [](Long value) {
+        union S64U64 {
+            Long u;
+            SLong s;
+        };
+
+        S64U64 v;
+        v.u = value;
+        return v.s;
+    };
+
+    auto AsUnsigned64 = [](SLong value) {
+        union S64U64 {
+            Long u;
+            SLong s;
+        };
+
+        S64U64 v;
         v.s = value;
         return v.u;
     };
@@ -718,6 +730,53 @@ bool VirtualMachine::Step(Word steps) {
         if (inexact) csrs[CSR_FCSR] |= CSR_FCSR_NX;
     };
 
+    auto UnsignedMul128 = [](Long lhs, Long rhs) {
+        Long u1 = (lhs & 0xffffffff);
+        Long v1 = (rhs & 0xffffffff);
+        Long t = (u1 & v1);
+        Long w3 = (t & 0xffffffff);
+        Long k = (w3 >> 32);
+
+        lhs >>= 32;
+        t = (lhs * v1) + k;
+        k = (t & 0xffffffff);
+        Long w1 = (t >> 32);
+
+        rhs >>= 32;
+        t = (u1 * rhs) + k;
+        k = (t >> 32);
+
+        return std::pair<Long, Long>((lhs * rhs) + w1 + k, (t << 32) + w3);
+    };
+
+    auto SignedMul128 = [&](SLong lhs, SLong rhs) {
+        bool lhs_neg = lhs < 0;
+        bool rhs_neg = rhs < 0;
+
+        if (lhs_neg) lhs = -lhs;
+        if (rhs_neg) rhs = -rhs;
+
+        auto result = UnsignedMul128(lhs, rhs);
+
+        if (lhs_neg != rhs_neg)
+            return std::pair<Long, Long>(-result.first, -result.second);
+        
+        return result;
+    };
+
+    auto SignedUnsignedMul128 = [&](SLong lhs, Long rhs) {
+        bool lhs_neg = lhs < 0;
+
+        if (lhs_neg) lhs = -lhs;
+
+        auto result = UnsignedMul128(lhs, rhs);
+
+        if (lhs_neg)
+            return std::pair<Long, Long>(-result.first, -result.second);
+        
+        return result;
+    };
+
     ticks += steps;
 
     using Type = RVInstruction::Type;
@@ -789,31 +848,79 @@ bool VirtualMachine::Step(Word steps) {
 
         bool inc_pc = true;
 
+        auto RS1 = [&]() {
+            if (Is32BitMode())
+                return static_cast<Long>(regs[instr.rs1].u32);
+            
+            return regs[instr.rs1].u64;
+        };
+
+        auto RS2 = [&]() {
+            if (Is32BitMode())
+                return static_cast<Long>(regs[instr.rs2].u32);
+            
+            return regs[instr.rs2].u64;
+        };
+
+        auto SignedRS1 = [&]() {
+            if (Is32BitMode())
+                return static_cast<SLong>(regs[instr.rs1].s32);
+            
+            return regs[instr.rs1].s64;
+        };
+
+        auto SignedRS2 = [&]() {
+            if (Is32BitMode())
+                return static_cast<SLong>(regs[instr.rs2].s32);
+            
+            return regs[instr.rs2].s64;
+        };
+
+        auto SetRD = [&](Long value) {
+            if (instr.rd == 0) return;
+
+            if (Is32BitMode())
+                regs[instr.rd].u32 = static_cast<Word>(value);
+            
+            else
+                regs[instr.rd].u64 = value;
+        };
+
+        auto SetSignedRD = [&](SLong value) {
+            if (instr.rd == 0) return;
+            
+            if (Is32BitMode())
+                regs[instr.rd].s32 = static_cast<SWord>(value);
+            
+            else
+                regs[instr.rd].s64 = value;
+        };
+
         switch (instr.type) {
             case Type::LUI:
-                regs[instr.rd] = instr.immediate;
+                SetRD(instr.immediate);
                 break;
             
             case Type::AUIPC:
-                regs[instr.rd] = pc + instr.immediate;
+                SetRD(pc + instr.immediate);
                 break;
             
             case Type::JAL: {
-                Word next_pc = pc + 4;
+                Long next_pc = pc + 4;
                 pc += instr.immediate;
-                regs[instr.rd] = next_pc;
+                SetRD(next_pc);
                 break;
             }
             
             case Type::JALR: {
-                Word next_pc = pc + 4;
-                pc = (regs[instr.rs1] + instr.immediate) & 0xfffffffe;
-                regs[instr.rd] = next_pc;
+                Long next_pc = pc + 4;
+                pc = (RS1() + instr.immediate) & 0xfffffffffffffffe;
+                SetRD(next_pc);
                 break;
             }
             
             case Type::BEQ: {
-                if (regs[instr.rs1] == regs[instr.rs2])
+                if (RS1() == RS2())
                     pc += instr.immediate;
                 
                 else
@@ -823,7 +930,7 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::BNE: {
-                if (regs[instr.rs1] != regs[instr.rs2])
+                if (RS1() != RS2())
                     pc += instr.immediate;
                 
                 else
@@ -833,7 +940,7 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::BLT: {
-                if (AsSigned(regs[instr.rs1]) < AsSigned(regs[instr.rs2]))
+                if (SignedRS1() < SignedRS2())
                     pc += instr.immediate;
                 
                 else
@@ -843,7 +950,7 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::BGE: {
-                if (AsSigned(regs[instr.rs1]) >= AsSigned(regs[instr.rs2]))
+                if (SignedRS1() >= SignedRS2())
                     pc += instr.immediate;
                 
                 else
@@ -853,7 +960,7 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::BLTU: {
-                if (regs[instr.rs1] < regs[instr.rs2])
+                if (RS1() < RS2())
                     pc += instr.immediate;
                 
                 else
@@ -863,7 +970,7 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::BGEU: {
-                if (regs[instr.rs1] >= regs[instr.rs2])
+                if (RS1() >= RS2())
                     pc += instr.immediate;
                 
                 else
@@ -873,155 +980,187 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::LB: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
-                regs[instr.rd] = SignExtend(memory.ReadByte(translated_address), 7);
+                SetRD(SignExtend(memory.ReadByte(translated_address), 7));
                 break;
             }
             
             case Type::LH: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
-                regs[instr.rd] = SignExtend(memory.ReadHalf(translated_address), 15);
+                SetRD(SignExtend(memory.ReadHalf(translated_address), 15));
                 break;
             }
             
             case Type::LW: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+                
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
-                regs[instr.rd] = memory.ReadWord(translated_address);
+                SetRD(SignExtend(memory.ReadWord(translated_address), 31));
                 break;
             }
 
             case Type::LBU: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
-                regs[instr.rd] = memory.ReadByte(translated_address);
+                SetRD(static_cast<Long>(memory.ReadByte(translated_address)));
                 break;
             }
             
             case Type::LHU: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
-                regs[instr.rd] = memory.ReadHalf(translated_address);
+                SetRD(static_cast<Long>(memory.ReadHalf(translated_address)));
                 break;
             }
             
             case Type::SB: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                if (Is32BitMode()) addr &= 0xfffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, true, false);
                 if (!translation_valid) continue;
-                memory.WriteByte(translated_address, regs[instr.rs2]);
+                memory.WriteByte(translated_address, static_cast<uint8_t>(RS2()));
                 break;
             }
             
             case Type::SH: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, true, false);
                 if (!translation_valid) continue;
-                memory.WriteHalf(translated_address, regs[instr.rs2]);
+                memory.WriteHalf(translated_address, static_cast<uint16_t>(RS2()));
                 break;
             }
             
             case Type::SW: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, true, false);
                 if (!translation_valid) continue;
-                memory.WriteWord(translated_address, regs[instr.rs2]);
+                memory.WriteWord(translated_address, RS2());
                 break;
             }
             
             case Type::ADDI:
-                regs[instr.rd] = regs[instr.rs1] + instr.immediate;
+                SetRD(RS1() + instr.immediate);
                 break;
             
             case Type::SLTI:
-                regs[instr.rd] = AsSigned(regs[instr.rs1]) < AsSigned(instr.immediate) ? 1 : 0;
+                SetRD(SignedRS1() < instr.s_immediate ? 1 : 0);
                 break;
             
             case Type::SLTIU:
-                regs[instr.rd] = regs[instr.rs1] < instr.immediate ? 1 : 0;
+                SetRD(RS1() < instr.immediate ? 1 : 0);
                 break;
             
             case Type::XORI:
-                regs[instr.rd] = regs[instr.rs1] ^ instr.immediate;
+                SetRD(RS1() ^ instr.immediate);
                 break;
             
             case Type::ORI:
-                regs[instr.rd] = regs[instr.rs1] | instr.immediate;
+                SetRD(RS1() | instr.immediate);
                 break;
             
             case Type::ANDI:
-                regs[instr.rd] = regs[instr.rs1] & instr.immediate;
+                SetRD(RS1() & instr.immediate);
                 break;
             
             case Type::SLLI: {
                 auto amount = instr.immediate & 0b111111;
-                regs[instr.rd] = regs[instr.rs1] << amount;
+                SetRD(RS1() << amount);
                 break;
             }
             
             case Type::SRLI: {
                 auto amount = instr.immediate & 0b111111;
-                regs[instr.rd] = regs[instr.rs1] >> amount;
+                SetRD(RS1() >> amount);
                 break;
             }
             
             case Type::SRAI: {
                 auto amount = instr.immediate & 0b111111;
-                auto value = regs[instr.rs1] >> amount;
-                Word sign = -1U << amount;
+                auto value = RS1() >> amount;
+                Long sign = -1ULL << amount;
 
-                if (regs[instr.rs1] & (1U << (32 - amount))) value |= sign;
-                regs[instr.rd] = value;
+                if (Is32BitMode() && (RS1() & (1ULL << 31)))
+                    value |= sign;
+                else if (!Is32BitMode() && (RS1() & (1ULL << 63)))
+                    value |= sign;
+
+                SetRD(value);
                 break;
             }
             
             case Type::ADD:
-                regs[instr.rd] = regs[instr.rs1] + regs[instr.rs2];
+                SetRD(RS1() + RS2());
                 break;
             
             case Type::SUB:
-                regs[instr.rd] = regs[instr.rs1] - regs[instr.rs2];
+                SetRD(RS1() - RS2());
                 break;
             
             case Type::SLL: {
-                auto amount = regs[instr.rs2] & 0x3f;
-                regs[instr.rd] = regs[instr.rs1] << amount;
+                auto amount = RS2() & 0x3f;
+                SetRD(RS1() << amount);
                 break;
             }
             
             case Type::SLT:
-                regs[instr.rd] = AsSigned(regs[instr.rs1]) < AsSigned(regs[instr.rs2]) ? 1 : 0;
+                SetRD(SignedRS1() < SignedRS2() ? 1 : 0);
                 break;
             
             case Type::SLTU:
-                regs[instr.rd] = regs[instr.rs1] < regs[instr.rs2] ? 1 : 0;
+                SetRD(RS1() < RS2() ? 1 : 0);
                 break;
             
             case Type::XOR:
-                regs[instr.rd] = regs[instr.rs1] ^ regs[instr.rs2];
+                SetRD(RS1() ^ RS2());
                 break;
             
             case Type::SRL: {
-                auto amount = regs[instr.rs2] & 0x3f;
-                regs[instr.rd] = regs[instr.rs1] >> amount;
+                auto amount = RS2() & 0x3f;
+                SetRD(RS1() >> amount);
                 break;
             }
             
             case Type::SRA: {
-                auto amount = regs[instr.rs2] & 0x3f;
-                auto value = regs[instr.rs1] >> amount;
-                Word sign = -1U << amount;
+                auto amount = RS2() & 0x3f;
+                auto value = RS1() >> amount;
+                Long sign = -1ULL << amount;
 
-                if (regs[instr.rs1] & (1U << (32 - amount))) value |= sign;
-                regs[instr.rd] = value;
+                if (Is32BitMode() && (RS1() & (1ULL << 31)))
+                    value |= sign;
+                else if (!Is32BitMode() && (RS1() & (1ULL << 63)))
+                    value |= sign;
+
+                SetRD(value);
                 break;
             }
             
             case Type::OR:
-                regs[instr.rd] = regs[instr.rs1] | regs[instr.rs2];
+                SetRD(RS1() | RS2());
                 break;
             
             case Type::AND:
-                regs[instr.rd] = regs[instr.rs1] & regs[instr.rs2];
+                SetRD(RS1() & RS2());
                 break;
             
             case Type::FENCE:
@@ -1029,13 +1168,17 @@ bool VirtualMachine::Step(Word steps) {
             
             case Type::ECALL:
                 switch (privilege_level) {
-                    case PrivilegeLevel::Machine:
-                        if (!ecall_handlers.contains(regs[REG_A0]))
-                            EmptyECallHandler(csrs[CSR_MHARTID], memory, regs, fregs);
+                    case PrivilegeLevel::Machine: {
+                        Long value = regs[REG_A0].u64;
+                        if (Is32BitMode()) value &= 0xffffffff;
+
+                        if (!ecall_handlers.contains(value))
+                            EmptyECallHandler(csrs[CSR_MHARTID], Is32BitMode(), memory, regs, fregs);
                         
                         else
-                            ecall_handlers[regs[REG_A0]](csrs[CSR_MHARTID], memory, regs, fregs);
+                            ecall_handlers[value](csrs[CSR_MHARTID], Is32BitMode(), memory, regs, fregs);
                         break;
+                    }
                     
                     case PrivilegeLevel::Supervisor:
                         RaiseException(EXCEPTION_ENVIRONMENT_CALL_FROM_S_MODE);
@@ -1056,22 +1199,202 @@ bool VirtualMachine::Step(Word steps) {
                 }
                 
                 break;
-            
+
+            case Type::LWU: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
+                if (!translation_valid) continue;
+                SetRD(memory.ReadWord(translated_address));
+                break;
+            }
+
+            case Type::LD: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
+                if (!translation_valid) continue;
+                SetRD(memory.ReadLong(translated_address));
+                break;
+            }
+
+            case Type::SD: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                Long addr = regs[instr.rs1].u64 + instr.immediate;
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, true, false);
+                if (!translation_valid) continue;
+                memory.WriteLong(translated_address, regs[instr.rs2].u64);
+                break;
+            };
+
+            case Type::ADDIW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                Long val = regs[instr.rs1].u64 + instr.immediate;
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
+            case Type::SLLIW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                auto shift = instr.immediate & 0b111111;
+                Long val = regs[instr.rs1].u64 << shift;
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
+            case Type::SRLIW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                auto shift = instr.immediate & 0b111111;
+                Long val = regs[instr.rs1].u64 >> shift;
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
+            case Type::SRAIW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                auto shift = instr.immediate & 0b111111;
+                Long val = regs[instr.rs1].u64 >> shift;
+                if (regs[instr.rs1].u64 & (1ULL << 63))
+                    val |= -1ULL << (64 - shift);
+
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
+            case Type::ADDW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                Long val = regs[instr.rs1].u64 + regs[instr.rs2].u64;
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
+            case Type::SUBW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                Long val = regs[instr.rs1].u64 - regs[instr.rs2].u64;
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
+            case Type::SLLW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                auto shift = regs[instr.rs2].u64 & 0b111111;
+                Long val = regs[instr.rs1].u64 << shift;
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
+            case Type::SRLW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                auto shift = regs[instr.rs2].u64 & 0b111111;
+                Long val = regs[instr.rs1].u64 >> shift;
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
+            case Type::SRAW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                auto shift = regs[instr.rs2].u64 & 0b111111;
+                Long val = regs[instr.rs1].u64 >> shift;
+                if (regs[instr.rs1].u64 & (1ULL << 63))
+                    val |= -1ULL << (64 - shift);
+                
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+                regs[instr.rd].u64 = val;
+                break;
+            }
+
             case Type::CSRRW: {
-                auto value = regs[instr.rs1];
+                auto value = RS1();
 
                 if (instr.rd != REG_ZERO)
-                    regs[instr.rd] = ReadCSR(instr.immediate);
+                    SetRD(ReadCSR(instr.immediate));
                 
                 WriteCSR(instr.immediate, value);
                 break;
             }
             
             case Type::CSRRS: {
-                auto value = regs[instr.rs1];
+                auto value = RS1();
 
                 if (instr.rd != REG_ZERO)
-                    regs[instr.rd] = ReadCSR(instr.immediate);
+                    SetRD(ReadCSR(instr.immediate));
                 
                 if (instr.rs1 != REG_ZERO)
                     WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) | value);
@@ -1080,9 +1403,9 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::CSRRC: {
-                auto value = regs[instr.rs1];
+                auto value = RS1();
                 if (instr.rd != REG_ZERO)
-                    regs[instr.rd] = ReadCSR(instr.immediate);
+                    SetRD(ReadCSR(instr.immediate));
                 
                 if (instr.rs1 != REG_ZERO)
                     WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) & ~value);
@@ -1093,7 +1416,7 @@ bool VirtualMachine::Step(Word steps) {
             case Type::CSRRWI: {
                 auto value = instr.rs1;
                 if (instr.rd != REG_ZERO)
-                    regs[instr.rd] = ReadCSR(instr.immediate);
+                    SetRD(ReadCSR(instr.immediate));
                 
                 WriteCSR(instr.immediate, value);
                 break;
@@ -1102,7 +1425,7 @@ bool VirtualMachine::Step(Word steps) {
             case Type::CSRRSI: {
                 auto value = instr.rs1;
                 if (instr.rd != REG_ZERO)
-                    regs[instr.rd] = ReadCSR(instr.immediate);
+                    SetRD(ReadCSR(instr.immediate));
                 
                 WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) | value);
                 break;
@@ -1111,91 +1434,109 @@ bool VirtualMachine::Step(Word steps) {
             case Type::CSRRCI: {
                 auto value = instr.rs1;
                 if (instr.rd != REG_ZERO)
-                    regs[instr.rd] = ReadCSR(instr.immediate);
+                    SetRD(ReadCSR(instr.immediate));
                 
                 WriteCSR(instr.immediate, ReadCSR(instr.immediate, true) & ~value);
                 break;
             }
             
             case Type::MUL: {
-                auto lhs = AsSigned(regs[instr.rs1]);
-                auto rhs = AsSigned(regs[instr.rs2]);
-                regs[instr.rd] = AsUnsigned(lhs * rhs);
+                auto lhs = SignedRS1();
+                auto rhs = SignedRS2();
+                SetSignedRD(lhs * rhs);
                 break;
             }
             
             case Type::MULH: {
-                SLong lhs = AsSigned(regs[instr.rs1]);
-                SLong rhs = AsSigned(regs[instr.rs2]);
-                SLong result = lhs * rhs;
-                regs[instr.rd] = AsUnsigned(static_cast<SWord>(result >> 32));
+                auto lhs = SignedRS1();
+                auto rhs = SignedRS2();
+
+                if (Is32BitMode()) 
+                    SetSignedRD((lhs * rhs) >> 32);
+
+                else {
+                    auto result = SignedMul128(lhs, rhs);
+                    SetSignedRD(result.first);
+                }
                 break;
             }
             
             case Type::MULHSU: {
-                SLong lhs = AsSigned(regs[instr.rs1]);
-                Long rhs = regs[instr.rs2];
-                SLong result = lhs * rhs;
-                regs[instr.rd] = AsUnsigned(static_cast<SWord>(result >> 32));
+                auto lhs = SignedRS1();
+                auto rhs = RS2();
+
+                if (Is32BitMode())
+                    SetSignedRD((lhs * rhs) >> 32);
+
+                else {
+                    auto result = SignedUnsignedMul128(lhs, rhs);
+                    SetSignedRD(result.first);
+                }
                 break;
             }
             
             case Type::MULHU: {
-                Long lhs = regs[instr.rs1];
-                Long rhs = regs[instr.rs2];
-                auto result = lhs * rhs;
-                regs[instr.rd] = static_cast<Word>(result >> 32);
+                auto lhs = RS1();
+                auto rhs = RS2();
+
+                if (Is32BitMode())
+                    SetRD((lhs * rhs) >> 32);
+                
+                else
+                    SetRD(lhs * rhs);
+                
                 break;
             }
 
             case Type::DIV: {
-                auto lhs = AsSigned(regs[instr.rs1]);
-                auto rhs = AsSigned(regs[instr.rs2]);
+                auto lhs = SignedRS1();
+                auto rhs = SignedRS2();
 
                 if (rhs == 0)
-                    regs[instr.rd] = -1U;
+                    SetRD(-1ULL);
                 
                 else
-                    regs[instr.rd] = AsUnsigned(lhs / rhs);
+                    SetSignedRD(lhs / rhs);
+                
                 break;
 
             }
             
             case Type::DIVU: {
-                auto lhs = regs[instr.rs1];
-                auto rhs = regs[instr.rs2];
+                auto lhs = RS1();
+                auto rhs = RS2();
 
                 if (rhs == 0)
-                    regs[instr.rd] = -1U;
+                    SetRD(-1ULL);
                 
                 else
-                    regs[instr.rd] = lhs / rhs;
+                    SetRD(lhs / rhs);
 
                 break;
             }
             
             case Type::REM: {
-                auto lhs = AsSigned(regs[instr.rs1]);
-                auto rhs = AsSigned(regs[instr.rs2]);
+                auto lhs = SignedRS1();
+                auto rhs = SignedRS2();
 
                 if (rhs == 0)
-                    regs[instr.rd] = 0;
+                    SetRD(0);
                 
                 else
-                    regs[instr.rd] = AsUnsigned(lhs % rhs);
+                    SetSignedRD(lhs % rhs);
 
                 break;
             }
             
             case Type::REMU: {
-                auto lhs = regs[instr.rs1];
-                auto rhs = regs[instr.rs2];
+                auto lhs = RS1();
+                auto rhs = RS2();
 
                 if (rhs == 0)
-                    regs[instr.rd] = 0;
+                    SetRD(0);
                 
                 else
-                    regs[instr.rd] = lhs % rhs;
+                    SetRD(lhs % rhs);
 
                 break;
             }
@@ -1206,95 +1547,95 @@ bool VirtualMachine::Step(Word steps) {
                     inc_pc = false;
                     break;
                 }
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.ReadWordReserved(translated_address, csrs[CSR_MHARTID]);
+                SetRD(memory.ReadWordReserved(translated_address, csrs[CSR_MHARTID]));
                 break;
             }
             
             case Type::SC_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], true, false);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), true, false);
                 if (!translation_valid) continue;
                 
-                if (memory.WriteWordConditional(translated_address, regs[instr.rs2], csrs[CSR_MHARTID]))
-                    regs[instr.rd] = 0;
+                if (memory.WriteWordConditional(translated_address, RS2(), csrs[CSR_MHARTID]))
+                    SetRD(0);
                 
                 else
-                    regs[instr.rd] = 1;
+                    SetRD(1);
                 
                 break;
             }
             
             case Type::AMOSWAP_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.AtomicSwap(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicSwapW(translated_address, RS2()));
                 break;
             }
             
             case Type::AMOADD_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.AtomicAdd(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicAddW(translated_address, RS2()));
                 break;
             }
             
             case Type::AMOXOR_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.AtomicXor(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicXorW(translated_address, RS2()));
                 break;
             }
             
             case Type::AMOAND_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.AtomicAnd(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicAndW(translated_address, RS2()));
                 break;
             }
             
             case Type::AMOOR_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
                 
-                regs[instr.rd] = memory.AtomicOr(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicOrW(translated_address, RS2()));
                 break;
             }
             
             case Type::AMOMIN_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.AtomicMin(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicMinW(translated_address, RS2()));
                 break;
             }
             
             case Type::AMOMAX_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.AtomicMax(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicMaxW(translated_address, RS2()));
                 break;
             }
             
             case Type::AMOMINU_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.AtomicMinU(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicMinUW(translated_address, RS2()));
                 break;
             }
             
             case Type::AMOMAXU_W: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false, true);
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
                 if (!translation_valid) continue;
 
-                regs[instr.rd] = memory.AtomicMaxU(translated_address, regs[instr.rs2]);
+                SetRD(memory.AtomicMaxUW(translated_address, RS2()));
                 break;
             }
             
@@ -1302,7 +1643,10 @@ bool VirtualMachine::Step(Word steps) {
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
 
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                auto addr = RS1() + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
 
                 fregs[instr.rd] = ToFloat(translated_address);
@@ -1310,7 +1654,10 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::FSW: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                auto addr = RS1() + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, true, false);
                 if (!translation_valid) continue;
                 memory.WriteWord(translated_address, ToUInt32(fregs[instr.rs2]));
                 break;
@@ -1687,10 +2034,11 @@ bool VirtualMachine::Step(Word steps) {
                     if (val != fregs[instr.rs1].f)
                         SetFloatFlags(false, false, false, false, true);
 
-                    result = AsUnsigned(static_cast<SWord>(val));
+                    result = AsUnsigned32(static_cast<SWord>(val));
                 }
 
-                regs[instr.rd] = result;
+                regs[instr.rd].u32 = result;
+                regs[instr.rd].is_u64 = 0;
                 break;
             }
             
@@ -1723,12 +2071,14 @@ bool VirtualMachine::Step(Word steps) {
                     result = val;
                 }
 
-                regs[instr.rd] = result;
+                regs[instr.rd].u32 = result;
+                regs[instr.rd].is_u64 = 0;
                 break;
             }
             
             case Type::FMV_X_W:
-                regs[instr.rd] = ToUInt32(fregs[instr.rs1]);
+                regs[instr.rd].u32 = ToUInt32(fregs[instr.rs1]);
+                regs[instr.rd].is_u64 = 0;
                 break;
             
             case Type::FEQ_S: {
@@ -1750,10 +2100,10 @@ bool VirtualMachine::Step(Word steps) {
                     SetFloatFlags(true, false, false, false, false);
                 
                 if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan)
-                    regs[instr.rd] = 0;
+                    regs[instr.rd].u64 = 0;
                 
                 else
-                    regs[instr.rd] = lhs.f == rhs.f ? 1 : 0;
+                    regs[instr.rd].u64 = lhs.f == rhs.f ? 1 : 0;
                 
                 break;
             }
@@ -1775,10 +2125,10 @@ bool VirtualMachine::Step(Word steps) {
                 
                 if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan) {
                     SetFloatFlags(true, false, false, false, false);
-                    regs[instr.rd] = 0;
+                    regs[instr.rd].u64 = 0;
                 }
                 else
-                    regs[instr.rd] = lhs.f < rhs.f ? 1 : 0;
+                    regs[instr.rd].u64 = lhs.f < rhs.f ? 1 : 0;
                 
                 break;
             }
@@ -1800,10 +2150,10 @@ bool VirtualMachine::Step(Word steps) {
                 
                 if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan) {
                     SetFloatFlags(true, false, false, false, false);
-                    regs[instr.rd] = 0;
+                    regs[instr.rd].u64 = 0;
                 }
                 else
-                    regs[instr.rd] = lhs.f <= rhs.f ? 1 : 0;
+                    regs[instr.rd].u64 = lhs.f <= rhs.f ? 1 : 0;
                 
                 break;
             }
@@ -1830,7 +2180,8 @@ bool VirtualMachine::Step(Word steps) {
                 if (is_nan) result |= 1 << 8;
                 if (is_qnan) result |= 1 << 9;
 
-                regs[instr.rd] = result;
+                regs[instr.rd].u32 = result;
+                regs[instr.rd].is_u64 = 0;
                 break;
             }
             
@@ -1838,7 +2189,7 @@ bool VirtualMachine::Step(Word steps) {
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
 
-                auto val = AsSigned(regs[instr.rs1]);
+                auto val = AsSigned32(regs[instr.rs1].u32);
 
                 fregs[instr.rd].f = val;
                 if (fregs[instr.rd].f != val)
@@ -1851,8 +2202,8 @@ bool VirtualMachine::Step(Word steps) {
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
 
-                fregs[instr.rd].f = regs[instr.rs1];
-                if (fregs[instr.rd].f != regs[instr.rs1])
+                fregs[instr.rd].f = regs[instr.rs1].u32;
+                if (fregs[instr.rd].f != regs[instr.rs1].u32)
                     SetFloatFlags(true, false, false, false, false);
                 
                 break;
@@ -1862,14 +2213,17 @@ bool VirtualMachine::Step(Word steps) {
                 sstatus.FS = FS_DIRTY;
 
                 fregs[instr.rd].u64 = 0;
-                fregs[instr.rd].u32 = regs[instr.rs1];
+                fregs[instr.rd].u32 = regs[instr.rs1].u32;
                 break;
             
             case Type::FLD: {
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
 
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, false, false);
+                auto addr = RS1() + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
 
                 Long val = memory.ReadWord(translated_address);
@@ -1879,7 +2233,10 @@ bool VirtualMachine::Step(Word steps) {
             }
             
             case Type::FSD: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1] + instr.immediate, true, false);
+                auto addr = RS1() + instr.immediate;
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, true, false);
                 if (!translation_valid) continue;
                 
                 auto val = ToUInt64(fregs[instr.rs2]);
@@ -2289,10 +2646,10 @@ bool VirtualMachine::Step(Word steps) {
                     SetFloatFlags(true, false, false, false, false);
                 
                 if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan)
-                    regs[instr.rd] = 0;
+                    regs[instr.rd].u64 = 0;
                 
                 else
-                    regs[instr.rd] = lhs.d == rhs.d ? 1 : 0;
+                    regs[instr.rd].u64 = lhs.d == rhs.d ? 1 : 0;
                 
                 break;
             }
@@ -2314,10 +2671,10 @@ bool VirtualMachine::Step(Word steps) {
                 
                 if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan) {
                     SetFloatFlags(true, false, false, false, false);
-                    regs[instr.rd] = 0;
+                    regs[instr.rd].u64 = 0;
                 }
                 else
-                    regs[instr.rd] = lhs.d < rhs.d ? 1 : 0;
+                    regs[instr.rd].u64 = lhs.d < rhs.d ? 1 : 0;
                 
                 break;
             }
@@ -2339,10 +2696,10 @@ bool VirtualMachine::Step(Word steps) {
                 
                 if (lhs_nan || rhs_nan || lhs_qnan || rhs_qnan) {
                     SetFloatFlags(true, false, false, false, false);
-                    regs[instr.rd] = 0;
+                    regs[instr.rd].u64 = 0;
                 }
                 else
-                    regs[instr.rd] = lhs.d <= rhs.d ? 1 : 0;
+                    regs[instr.rd].u64 = lhs.d <= rhs.d ? 1 : 0;
                 
                 break;
             }
@@ -2369,7 +2726,8 @@ bool VirtualMachine::Step(Word steps) {
                 if (is_nan) result |= 1 << 8;
                 if (is_qnan) result |= 1 << 9;
 
-                regs[instr.rd] = result;
+                regs[instr.rd].u32 = result;
+                regs[instr.rd].is_u64 = 0;
                 break;
             }
             
@@ -2399,10 +2757,11 @@ bool VirtualMachine::Step(Word steps) {
                     if (val != fregs[instr.rs1].d)
                         SetFloatFlags(false, false, false, false, true);
 
-                    result = AsUnsigned(static_cast<SWord>(val));
+                    result = AsUnsigned32(static_cast<SWord>(val));
                 }
 
-                regs[instr.rd] = result;
+                regs[instr.rd].u32 = result;
+                regs[instr.rd].is_u64 = 0;
                 break;
             }
             
@@ -2435,7 +2794,8 @@ bool VirtualMachine::Step(Word steps) {
                     result = val;
                 }
 
-                regs[instr.rd] = result;
+                regs[instr.rd].u32 = result;
+                regs[instr.rd].is_u64 = 0;
                 break;
             }
             
@@ -2443,7 +2803,7 @@ bool VirtualMachine::Step(Word steps) {
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
 
-                auto val = AsSigned(regs[instr.rs1]);
+                auto val = AsSigned32(regs[instr.rs1].u32);
 
                 fregs[instr.rd].d = val;
                 if (fregs[instr.rd].d != val)
@@ -2456,8 +2816,8 @@ bool VirtualMachine::Step(Word steps) {
                 mstatus.FS = FS_DIRTY;
                 sstatus.FS = FS_DIRTY;
                 
-                fregs[instr.rd].d = regs[instr.rs1];
-                if (fregs[instr.rd].d != regs[instr.rs1])
+                fregs[instr.rd].d = regs[instr.rs1].u32;
+                if (fregs[instr.rd].d != regs[instr.rs1].u32)
                     SetFloatFlags(true, false, false, false, false);
                 
                 break;
@@ -2535,15 +2895,18 @@ bool VirtualMachine::Step(Word steps) {
                 break;
             
             case Type::CUST_TVA: {
-                auto [translated_address, translation_valid] = TranslateMemoryAddress(regs[instr.rs1], false, false);
-                regs[instr.rd] = translated_address;
+                auto addr = RS1();
+                if (Is32BitMode()) addr &= 0xffffffff;
+
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
+                regs[instr.rd].u64 = translated_address;
                 break;
             }
             
             case Type::CUST_MTRAP:
                 pc += 4;
 
-                switch (regs[instr.rs2] & 0b11) {
+                switch (regs[instr.rs2].u64 & 0b11) {
                     case MACHINE_MODE:
                         privilege_level = PrivilegeLevel::Machine;
                         break;
@@ -2557,13 +2920,18 @@ bool VirtualMachine::Step(Word steps) {
                         break;
                 }
 
-                RaiseMachineTrap(regs[instr.rs1]);
+                if (Is32BitMode())
+                    RaiseMachineTrap(regs[instr.rs1].u32);
+
+                else
+                    RaiseMachineTrap(regs[instr.rs1].u64);
+                
                 continue;
             
             case Type::CUST_STRAP:
                 pc += 4;
 
-                switch (regs[instr.rs2] & 0b11) {
+                switch (regs[instr.rs2].u64 & 0b11) {
                     case MACHINE_MODE:
                         privilege_level = PrivilegeLevel::Machine;
                         break;
@@ -2577,7 +2945,12 @@ bool VirtualMachine::Step(Word steps) {
                         break;
                 }
                 
-                RaiseSupervisorTrap(regs[instr.rs1]);
+                if (Is32BitMode())
+                    RaiseSupervisorTrap(regs[instr.rs1].u32);
+                
+                else
+                    RaiseSupervisorTrap(regs[instr.rs1].u64);
+                
                 continue;
 
             case Type::INVALID:
@@ -2602,8 +2975,6 @@ bool VirtualMachine::Step(Word steps) {
                 if (inc_pc)
                     pc += 4;
         }
-        
-        if (instr.rd == 0) regs[instr.rd] = 0;
 
         if (IsBreakPoint(pc)) return true;
     }
@@ -2628,23 +2999,18 @@ void VirtualMachine::Run() {
     }
 }
 
-void VirtualMachine::GetSnapshot(std::array<Word, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, Word& pc) {
+void VirtualMachine::GetSnapshot(std::array<Reg, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, Long& pc) {
     registers = regs;
     fregisters = fregs;
     pc = this->pc;
 }
 
-void VirtualMachine::GetCSRSnapshot(std::unordered_map<Word, Word>& csrs) const {
+void VirtualMachine::GetCSRSnapshot(std::unordered_map<Long, Long>& csrs) const {
     csrs = this->csrs;
-    auto mcycle = static_cast<Word>(cycles);
-    auto mcycleh = static_cast<Word>(cycles >> 32);
-    csrs[CSR_MCYCLE] = mcycle;
-    csrs[CSR_MCYCLEH] = mcycleh;
-    csrs[CSR_CYCLE] = mcycle;
-    csrs[CSR_CYCLEH] = mcycleh;
+    csrs[CSR_MCYCLE] = cycles;
+    csrs[CSR_CYCLE] = cycles;
 
-    csrs[CSR_TIME] = static_cast<Word>(csr_mapped_memory->time);
-    csrs[CSR_TIMEH] = static_cast<Word>(csr_mapped_memory->time >> 32);
+    csrs[CSR_TIME] = csr_mapped_memory->time;
 
     csrs[CSR_MIP] = mip;
     csrs[CSR_MIE] = mie;
@@ -2701,8 +3067,11 @@ void VirtualMachine::UpdateTime(double delta_time) {
     }
 }
 
-void VirtualMachine::EmptyECallHandler(Word hart, Memory&, std::array<Word, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&) {
-    throw std::runtime_error(std::format("Hart {} called unknown ECall handler: {}", hart, regs[REG_A0]));
+void VirtualMachine::EmptyECallHandler(Hart hart, bool is_32_bit_mode, Memory&, std::array<Reg, REGISTER_COUNT>& regs, std::array<Float, REGISTER_COUNT>&) {
+    if (is_32_bit_mode)
+        throw std::runtime_error(std::format("Hart {} called unknown ECall handler: {}", hart, regs[REG_A0].s32));
+    else
+        throw std::runtime_error(std::format("Hart {} called unknown ECall handler: {}", hart, regs[REG_A0].s64));
 }
 
-std::unordered_map<Word, VirtualMachine::ECallHandler> VirtualMachine::ecall_handlers;
+std::unordered_map<Long, VirtualMachine::ECallHandler> VirtualMachine::ecall_handlers;

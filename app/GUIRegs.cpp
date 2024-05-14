@@ -4,19 +4,32 @@
 
 #include <imgui.h>
 
+#include <format>
+
 void GUIRegs::Draw() {
+    using VM = VirtualMachine;
     if (ImGui::Begin("Registers")) {
-        std::array<Word, VirtualMachine::REGISTER_COUNT> regs;
-        std::array<Float, VirtualMachine::REGISTER_COUNT> fregs;
-        Word pc;
+        std::array<VM::Reg, VM::REGISTER_COUNT> regs;
+        std::array<Float, VM::REGISTER_COUNT> fregs;
+        Long pc;
 
         vm->GetSnapshot(regs, fregs, pc);
 
-        ImGui::TextColored(gui_pc_highlight_color, "          pc  : 0x%08x", pc);
-        ImGui::TextColored(gui_sp_highlight_color, "          sp  : 0x%08x", regs[2]);
-        ImGui::Text(" ");
+        if (vm->Is32BitMode())
+            ImGui::TextColored(gui_pc_highlight_color, "%s", std::format("          pc  : 0x{:0>8x}", pc).c_str());
+        
+        else
+            ImGui::TextColored(gui_pc_highlight_color, "%s", std::format("          pc  : 0x{:0>16x}", pc).c_str());
+        
+        if (vm->Is32BitMode())
+            ImGui::TextColored(gui_pc_highlight_color, "%s", std::format("          sp  : 0x{:0>8x}", regs[VM::REG_SP].u32).c_str());
+        
+        else
+            ImGui::TextColored(gui_pc_highlight_color, "%s", std::format("          sp  : 0x{:0>16x}", regs[VM::REG_SP].u64).c_str());
 
-        std::array<std::string, VirtualMachine::REGISTER_COUNT> names = {
+        ImGui::NewLine();
+
+        std::array<std::string, VM::REGISTER_COUNT> names = {
             "zero",
             "ra",
             "sp",
@@ -51,7 +64,7 @@ void GUIRegs::Draw() {
             "t6"
         };
 
-        std::array<std::string, VirtualMachine::REGISTER_COUNT> fnames = {
+        std::array<std::string, VM::REGISTER_COUNT> fnames = {
             "ft0",
             "ft1",
             "ft2",
@@ -86,13 +99,35 @@ void GUIRegs::Draw() {
             "ft11"
         };
 
-        for (size_t i = 0; i < VirtualMachine::REGISTER_COUNT; i++) {
-            ImGui::Text("%-10sx%-2u : 0x%08x (%i)", names[i].c_str(), static_cast<Word>(i), regs[i], regs[i]);
+        union SU {
+            struct {
+                uint32_t u32;
+                uint32_t _unused0;
+            };
+            struct {
+                int32_t s32;
+                int32_t _unused1;
+            };
+            uint64_t u64;
+            int64_t s64;
+        };
+
+        for (size_t i = 0; i < VM::REGISTER_COUNT; i++) {
+            std::string fmt;
+            SU su;
+            su.u64 = regs[i].u64;
+            if (vm->Is32BitMode())
+                fmt = std::format("{:<10}x{:<2} : 0x{:0>8x} ({})", names[i].c_str(), i, su.u32, su.s32);
+            
+            else
+                fmt = std::format("{:<10}x{:<2} : 0x{:0>16x} ({})", names[i].c_str(), i, su.u64, su.s64);
+            
+            ImGui::Text("%s", fmt.c_str());
         }
 
         ImGui::Text(" ");
 
-        for (size_t i = 0; i < VirtualMachine::REGISTER_COUNT; i++) {
+        for (size_t i = 0; i < VM::REGISTER_COUNT; i++) {
             if (fregs[i].is_double)
                 ImGui::Text("%-10sf%-2u : 0x%016llx (%.8g)", fnames[i].c_str(), static_cast<Word>(i), *reinterpret_cast<Address*>(&fregs[i].d), fregs[i].d);
 

@@ -6,8 +6,11 @@
 .extern printf
 
 _start:
-    li t0, 1
     la sp, stack_top
+
+    la t0, data
+    lw t1, 0(t0)
+    //lwu t1, 0(t0)
 
     csrr t0, mvendorid
     csrr t1, marchid
@@ -24,8 +27,8 @@ _start:
     addi sp, sp, -4
     sw a0, (sp)
 
-    li a0, 0
-    call putc
+    //li a0, 0
+    //call putc
 
     lw a1, (sp)
     add sp, sp, 4
@@ -45,66 +48,6 @@ machine_break:
     ebreak
     ret
 
-.globl set_vtable_addr
-set_vtable_addr:
-    csrw satp, a0
-    ret
-
-.global enable_smode
-enable_smode:
-    // Set reset vector
-    la t0, .smode
-    csrw mepc, t0
-
-    // Set reset privilege to supervisor
-    csrr t0, mstatus
-    li t1, 0b1100000000000
-    not t1, t1
-    and t0, t0, t1
-    li t1, 0b100000000000
-    or t0, t0, t1
-    csrw mstatus, t0
-
-    // Setup machine ebreak
-    la t0, .mmode
-    csrw mtvec, t0
-
-    ebreak
-    mret
-
-.smode:
-    // Enable virtual memory
-    csrr t0, satp
-    li t1, 0x80000000
-    or t0, t0, t1
-    csrw satp, t0
-    
-    ret
-
-.mmode:
-    // Forward machine calls
-    ebreak
-    ecall
-    addi sp, sp, -8
-    sw t0, (sp)
-    sw t1, 4(sp)
-
-    csrr t0, mcause
-    li t1, 0x80000000
-    and t0, t0, t1
-    beq t0, t1, .dont_inc_pc
-
-    csrr t0, mepc
-    addi t0, t0, 4
-    csrw mepc, t0
-
-.dont_inc_pc:
-    lw t0, (sp)
-    lw t1, 4(sp)
-    addi sp, sp, 8
-
-    mret
-
 .data
 
 .align 4
@@ -115,6 +58,8 @@ argv_1: .string "bios.elf"
 
 .align 4
 argv: .word argv_0, argv_1, 0
+
+data: .word 0x82345678, 0x9abcdef0
 
 .bss
 

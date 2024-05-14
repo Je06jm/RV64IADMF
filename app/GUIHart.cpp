@@ -48,6 +48,12 @@ void GUIHart::Draw() {
 
         ImGui::NewLine();
 
+        if (vm->Is32BitMode())
+            ImGui::Text("Bits: 32");
+        
+        else
+            ImGui::Text("Bits: 64");
+
         switch (vm->privilege_level) {
             case VirtualMachine::PrivilegeLevel::Machine:
                 ImGui::Text("Privilege Level: Machine");

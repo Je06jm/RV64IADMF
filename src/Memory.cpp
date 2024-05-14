@@ -4,59 +4,72 @@
 #include <format>
 #include <fstream>
 
+Word MemoryRegion::ReadWord(Address address) const {
+    auto vlong = ReadLong(address & ~7);
+    return static_cast<Long>(vlong >> ((address & 4) * 8));
+}
+
 Half MemoryRegion::ReadHalf(Address address) const {
-    auto word = ReadWord(address & ~3);
-    return static_cast<Half>(word >> ((address & 2) * 8));
+    auto vlong = ReadLong(address & ~7);
+    return static_cast<Half>(vlong >> ((address & 6) * 8));
 }
 
 Byte MemoryRegion::ReadByte(Address address) const {
-    auto word = ReadWord(address & ~3);
-    return static_cast<Byte>(word >> ((address & 3) * 8));
+    auto vlong = ReadLong(address & ~7);
+    return static_cast<Byte>(vlong >> ((address & 7) * 8));
+}
+
+void MemoryRegion::WriteWord(Address address, Word word) {
+    auto vlong = ReadLong(address & ~7);
+    auto shift = (address & 4) * 8;
+    vlong &= ~(0xffffffffLL << shift);
+    vlong |= static_cast<Long>(word) << shift;
+    WriteLong(address, vlong);
 }
 
 void MemoryRegion::WriteHalf(Address address, Half half) {
-    auto word = ReadWord(address & ~3);
-    auto shift = (address & 2) * 8;
-    word &= ~(0xffff << shift);
-    word |= half << shift;
-    WriteWord(address & ~3, word);
+    auto vlong = ReadLong(address & ~3);
+    auto shift = (address & 6) * 8;
+    vlong &= ~(0xffffLL << shift);
+    vlong |= static_cast<Long>(half) << shift;
+    WriteLong(address & ~3, vlong);
 }
 
 void MemoryRegion::WriteByte(Address address, Byte byte) {
-    auto word = ReadWord(address & ~3);
-    auto shift = (address & 3) * 8;
-    word &= ~(0xff << shift);
-    word |= byte << shift;
-    WriteWord(address & ~3, word);
+    auto vlong = ReadLong(address & ~3);
+    auto shift = (address & 7) * 8;
+    vlong &= ~(0xffLL << shift);
+    vlong |= static_cast<Long>(byte) << shift;
+    WriteLong(address & ~3, vlong);
 }
 
-std::unique_ptr<MemoryROM> MemoryROM::Create(const std::vector<Word>& words, Address base) {
-    return std::unique_ptr<MemoryROM>(new MemoryROM(words, base & ~3));
+std::unique_ptr<MemoryROM> MemoryROM::Create(const std::vector<Long>& longs, Address base) {
+    return std::unique_ptr<MemoryROM>(new MemoryROM(longs, base & ~7));
 }
 
-MemoryRAM::MemoryRAM(Address base, Address size) : MemoryRegion(TYPE_GENERAL_RAM, base, size, true, true) {
-    size_t pages_count = size / WORDS_PER_PAGE;
+MemoryRAM::MemoryRAM(Address base, Address size) : MemoryRegion(TYPE_GENERAL_RAM, 0, base, size, true, true) {
+    size_t pages_count = size / LONGS_PER_PAGE;
 
     for (size_t i = 0; i < pages_count; i++)
         pages.push_back(nullptr);
 }
 
-Word MemoryRAM::ReadWord(Address address) const {
-    size_t page = address / WORDS_PER_PAGE;
+Long MemoryRAM::ReadLong(Address address) const {
+    size_t page = address / LONGS_PER_PAGE;
     address %= PAGE_SIZE;
 
     EnsurePageIsLoaded(page);
 
-    return (*pages[page])[address >> 2];
+    return (*pages[page])[address >> 3];
 }
 
-void MemoryRAM::WriteWord(Address address, Word word) {
-    size_t page = address / WORDS_PER_PAGE;
+void MemoryRAM::WriteLong(Address address, Long vlong) {
+    size_t page = address / LONGS_PER_PAGE;
     address %= PAGE_SIZE;
 
     EnsurePageIsLoaded(page);
 
-    (*pages[page])[address >> 2] = word;
+    (*pages[page])[address >> 3] = vlong;
 }
 
 std::unique_ptr<MemoryRAM> MemoryRAM::Create(Address base, Address size) {
@@ -88,20 +101,40 @@ const MemoryRegion* Memory::GetMemoryRegion(Address address) const {
     return nullptr;
 }
 
+Long Memory::ReadLong(Address address) const {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned read of word at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot read address {:#18} as it's unreadable", address));
+
+    auto vlong = region->ReadLong(address - region->base);
+
+    return vlong;
+}
+
 Word Memory::ReadWord(Address address) const {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned read of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned read of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot read address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot read address {:#18} as it's unreadable", address));
 
     auto word = region->ReadWord(address - region->base);
 
@@ -113,15 +146,15 @@ Half Memory::ReadHalf(Address address) const {
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 1)
-        throw std::runtime_error(std::format("Unaligned read of half at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned read of half at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot read address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot read address {:#18} as it's unreadable", address));
 
     auto half = region->ReadHalf(address - region->base);
 
@@ -135,10 +168,10 @@ Byte Memory::ReadByte(Address address) const {
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot read address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot read address {:#18} as it's unreadable", address));
 
     auto byte = region->ReadByte(address - region->base);
 
@@ -147,7 +180,7 @@ Byte Memory::ReadByte(Address address) const {
 
 std::pair<Word, bool> Memory::PeekWord(Address address) const {
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned read of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned read of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
@@ -167,7 +200,7 @@ bool Memory::TryWriteWord(Address address, Word word) {
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned write of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned write of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
@@ -181,20 +214,38 @@ bool Memory::TryWriteWord(Address address, Word word) {
     return true;
 }
 
+void Memory::WriteLong(Address address, Long vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned write of word at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot write address {:#18} as it's unwritable", address));
+
+    region->WriteLong(address - region->base, vlong);
+}
+
 void Memory::WriteWord(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned write of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned write of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot write address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot write address {:#18} as it's unwritable", address));
 
     region->WriteWord(address - region->base, word);
 }
@@ -204,15 +255,15 @@ void Memory::WriteHalf(Address address, Half half) {
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 1)
-        throw std::runtime_error(std::format("Unaligned write of half at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned write of half at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot write address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot write address {:#18} as it's unwritable", address));
     
     region->WriteHalf(address - region->base, half);
 }
@@ -224,57 +275,299 @@ void Memory::WriteByte(Address address, Byte byte) {
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot write address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot write address {:#18} as it's unwritable", address));
     
     region->WriteByte(address - region->base, byte);
 }
 
-Word Memory::AtomicSwap(Address address, Word word) {
+Long Memory::AtomicSwapL(Address address, Long vlong) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
-    if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     region->Lock();
-    auto old_word = region->ReadWord(address - region->base);
+    auto old_long = region->ReadLong(address - region->base);
+    region->WriteLong(address - region->base, vlong);
+    region->Lock();
+
+    return old_long;
+}
+
+Long Memory::AtomicAddL(Address address, Long vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    region->Lock();
+    auto old_long = region->ReadLong(address - region->base);
+    region->WriteLong(address - region->base, old_long + vlong);
+    region->Unlock();
+
+    return old_long;
+}
+
+Long Memory::AtomicAndL(Address address, Long vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    region->Lock();
+    auto old_long = region->ReadLong(address - region->base);
+    region->WriteLong(address - region->base, old_long & vlong);
+    region->Unlock();
+
+    return old_long;
+}
+
+Long Memory::AtomicOrL(Address address, Long vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    region->Lock();
+    auto old_long = region->ReadLong(address - region->base);
+    region->WriteLong(address - region->base, old_long | vlong);
+    region->Unlock();
+
+    return old_long;
+}
+
+Long Memory::AtomicXorL(Address address, Long vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    region->Lock();
+    auto old_long = region->ReadLong(address - region->base);
+    region->WriteLong(address - region->base, old_long ^ vlong);
+    region->Unlock();
+
+    return old_long;
+}
+
+SLong Memory::AtomicMinL(Address address, SLong vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    U32S32 v;
+
+    region->Lock();
+    auto old_long = region->ReadLong(address - region->base);
+    v.u = old_long;
+    if (vlong < v.s) v.s = vlong;
+    region->WriteLong(address - region->base, v.u);
+    region->Unlock();
+
+    return old_long;
+}
+
+Long Memory::AtomicMinUL(Address address, Long vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    region->Lock();
+    auto old_long = region->ReadLong(address - region->base);
+    if (vlong < old_long) region->WriteLong(address - region->base, vlong);
+    region->Unlock();
+
+    return old_long;
+}
+
+SLong Memory::AtomicMaxL(Address address, SLong vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    U32S32 v;
+
+    region->Lock();
+    auto old_long = region->ReadLong(address - region->base);
+    v.u = old_long;
+    if (vlong > v.s) v.s = vlong;
+    region->WriteLong(address - region->base, v.u);
+    region->Unlock();
+
+    return old_long;
+}
+
+Long Memory::AtomicMaxUL(Address address, Long vlong) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 7)
+        throw std::runtime_error(std::format("Unaligned atomic of long at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    region->Lock();
+    auto old_long = region->ReadLong(address - region->base);
+    if (vlong > old_long) region->WriteLong(address - region->base, vlong);
+    region->Unlock();
+
+    return old_long;
+}
+
+Word Memory::AtomicSwapW(Address address, Word word) {
+    if (address >= max_address)
+        throw std::runtime_error(std::format("Tried reading from memory past max_address"));
+
+    if (address & 3)
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
+
+    auto region = GetMemoryRegion(address);
+
+    if (!region)
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
+    
+    if (!region->readable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
+    
+    if (!region->writable)
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
+
+    region->Lock();
+    auto old_word = region->ReadLong(address - region->base);
     region->WriteWord(address - region->base, word);
     region->Lock();
 
     return old_word;
 }
 
-Word Memory::AtomicAdd(Address address, Word word) {
+Word Memory::AtomicAddW(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     region->Lock();
     auto old_word = region->ReadWord(address - region->base);
@@ -284,23 +577,23 @@ Word Memory::AtomicAdd(Address address, Word word) {
     return old_word;
 }
 
-Word Memory::AtomicAnd(Address address, Word word) {
+Word Memory::AtomicAndW(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     region->Lock();
     auto old_word = region->ReadWord(address - region->base);
@@ -310,23 +603,23 @@ Word Memory::AtomicAnd(Address address, Word word) {
     return old_word;
 }
 
-Word Memory::AtomicOr(Address address, Word word) {
+Word Memory::AtomicOrW(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     region->Lock();
     auto old_word = region->ReadWord(address - region->base);
@@ -336,23 +629,23 @@ Word Memory::AtomicOr(Address address, Word word) {
     return old_word;
 }
 
-Word Memory::AtomicXor(Address address, Word word) {
+Word Memory::AtomicXorW(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     region->Lock();
     auto old_word = region->ReadWord(address - region->base);
@@ -362,23 +655,23 @@ Word Memory::AtomicXor(Address address, Word word) {
     return old_word;
 }
 
-int32_t Memory::AtomicMin(Address address, int32_t word) {
+int32_t Memory::AtomicMinW(Address address, int32_t word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     U32S32 v;
 
@@ -392,23 +685,23 @@ int32_t Memory::AtomicMin(Address address, int32_t word) {
     return old_word;
 }
 
-Word Memory::AtomicMinU(Address address, Word word) {
+Word Memory::AtomicMinUW(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     region->Lock();
     auto old_word = region->ReadWord(address - region->base);
@@ -418,23 +711,23 @@ Word Memory::AtomicMinU(Address address, Word word) {
     return old_word;
 }
 
-int32_t Memory::AtomicMax(Address address, int32_t word) {
+int32_t Memory::AtomicMaxW(Address address, int32_t word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     U32S32 v;
 
@@ -448,23 +741,23 @@ int32_t Memory::AtomicMax(Address address, int32_t word) {
     return old_word;
 }
 
-Word Memory::AtomicMaxU(Address address, Word word) {
+Word Memory::AtomicMaxUW(Address address, Word word) {
     if (address >= max_address)
         throw std::runtime_error(std::format("Tried reading from memory past max_address"));
 
     if (address & 3)
-        throw std::runtime_error(std::format("Unaligned atomic of word at {:#10x}", address));
+        throw std::runtime_error(std::format("Unaligned atomic of word at {:#18}", address));
 
     auto region = GetMemoryRegion(address);
 
     if (!region)
-        throw std::runtime_error(std::format("Address {:#10x} is not mapped to any memory", address));
+        throw std::runtime_error(std::format("Address {:#18} is not mapped to any memory", address));
     
     if (!region->readable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unreadable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unreadable", address));
     
     if (!region->writable)
-        throw std::runtime_error(std::format("Cannot atomic address {:#10x} as it's unwritable", address));
+        throw std::runtime_error(std::format("Cannot atomic address {:#18} as it's unwritable", address));
 
     region->Lock();
     auto old_word = region->ReadWord(address - region->base);
@@ -474,16 +767,61 @@ Word Memory::AtomicMaxU(Address address, Word word) {
     return old_word;
 }
 
+void Memory::WriteLongs(Address address, const std::vector<Long>& longs) {
+    for (Address head = address, i = 0; i < longs.size(); i++, head += 8) {
+        WriteLong(head, longs[i]);
+    }
+}
+
 void Memory::WriteWords(Address address, const std::vector<Word>& words) {
     for (Address head = address, i = 0; i < words.size(); i++, head += 4) {
         WriteWord(head, words[i]);
     }
 }
 
+std::vector<Long> Memory::ReadLongs(Address address, Address count) const {
+    std::vector<Long> data;
+    for (Address head = address, i = 0; i < count; i++, head += 8) {
+        data.push_back(ReadLong(head));
+    }
+
+    return data;
+}
+
 std::vector<Word> Memory::ReadWords(Address address, Address count) const {
     std::vector<Word> data;
     for (Address head = address, i = 0; i < count; i++, head += 4) {
         data.push_back(ReadWord(head));
+    }
+
+    return data;
+}
+
+std::vector<std::pair<Long, bool>> Memory::PeekLongs(Address address, Address count) const {
+    std::vector<std::pair<Long, bool>> data;
+
+    const MemoryRegion* region = nullptr;
+    Address end;
+    for (Address head = address, i = 0; i < count; i++, head += 8) {
+        if (!region) {
+            region = GetMemoryRegion(head);
+            if (region) {
+                end = region->base + region->size;
+                data.push_back({region->ReadLong(head - region->base), true});
+            }
+            else
+                data.push_back({0, false});
+        }
+        else {
+            if (!(head >= region->base && head < end))
+                region = GetMemoryRegion(head);
+            
+            if (region) {
+                data.push_back({region->ReadLong(head - region->base), true});
+            }
+            else
+                data.push_back({0, false});
+        }
     }
 
     return data;
@@ -519,6 +857,21 @@ std::vector<std::pair<Word, bool>> Memory::PeekWords(Address address, Address co
     return data;
 }
 
+Long Memory::ReadLongReserved(Address address, Hart hart_id) const {
+    lock.lock();
+    for (auto& item : reservations) {
+        if (item.second == (address & ~0b11)) {
+            reservations.erase(item.first);
+            break;
+        }
+    }
+    
+    reservations[hart_id] = address & ~0b11;
+    lock.unlock();
+
+    return ReadLong(address);
+}
+
 Word Memory::ReadWordReserved(Address address, Hart hart_id) const {
     lock.lock();
     for (auto& item : reservations) {
@@ -532,6 +885,27 @@ Word Memory::ReadWordReserved(Address address, Hart hart_id) const {
     lock.unlock();
 
     return ReadWord(address);
+}
+
+bool Memory::WriteLongConditional(Address address, Long value, Hart hart_id) {
+    lock.lock();
+    if (reservations.find(hart_id) == reservations.end()) {
+        lock.unlock();
+        return false;
+    }
+
+    if (reservations[hart_id] != (address & ~0b11)) {
+        auto addr = reservations[hart_id];
+        lock.unlock();
+        return false;
+    }
+
+    reservations.erase(hart_id);
+
+    lock.unlock();
+
+    WriteLong(address, value);
+    return true;
 }
 
 bool Memory::WriteWordConditional(Address address, Word value, Hart hart_id) {
@@ -563,18 +937,17 @@ Address Memory::ReadFileInto(const std::string& path, Address address) {
     }
 
     Address size = file.tellg();
-    Word words = size / 4;
-    if (size % 4) words++;
+    Word longs = (size + 7) / 8;
     
     file.seekg(0);
 
-    std::vector<Word> data(words);
-    data[words - 1] = 0;
+    std::vector<Long> data(longs);
+    data[longs - 1] = 0;
 
     file.read(reinterpret_cast<char*>(data.data()), size);
     file.close();
 
-    WriteWords(address, data);
+    WriteLongs(address, data);
 
     return size;
 }
@@ -586,9 +959,9 @@ void Memory::WriteToFile(const std::string& path, Address address, Address bytes
         throw std::runtime_error(std::format("Could not open {} for writing", path));
     }
 
-    Address count = (bytes + 3) / 4;
+    Address count = (bytes + 7) / 8;
     
-    auto data = ReadWords(address, count);
+    auto data = ReadLongs(address, count);
 
     file.write(reinterpret_cast<char*>(data.data()), bytes);
     file.close();

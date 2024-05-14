@@ -194,7 +194,10 @@ struct RVInstruction {
 
     Type type = Type::INVALID;
 
-    Word immediate;
+    union {
+        Long immediate;
+        SLong s_immediate;
+    };
     Byte rd, rs1, rs2;
 
     Byte rm;

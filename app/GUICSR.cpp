@@ -9,67 +9,65 @@
 #include <string>
 
 void GUICSR::Draw() {
-    using CSRTuple = std::tuple<Word, std::string, bool>;
+    using CSRTuple = std::tuple<Word, std::string>;
     using VM = VirtualMachine;
     
     static std::array csrs_names = {
-        CSRTuple(VM::CSR_FFLAGS, "fflags", false),
-        CSRTuple(VM::CSR_FRM, "frm", false),
-        CSRTuple(VM::CSR_FCSR, "fcsr", false),
-        CSRTuple(VM::CSR_CYCLE, "cycle", false),
-        CSRTuple(VM::CSR_TIME, "time", false),
-        CSRTuple(VM::CSR_INSTRET, "instret", false),
-        CSRTuple(VM::CSR_CYCLEH, "cycleh", false),
-        CSRTuple(VM::CSR_TIMEH, "timeh", false),
-        CSRTuple(VM::CSR_INSTRETH, "instreth", false),
-        CSRTuple(VM::CSR_SSTATUS, "sstatus", false),
-        CSRTuple(VM::CSR_SIE, "sie", false),
-        CSRTuple(VM::CSR_STVEC, "stvec", false),
-        CSRTuple(VM::CSR_SENVCFG, "senvcfg", false),
-        CSRTuple(VM::CSR_SSCRATCH, "sscratch", false),
-        CSRTuple(VM::CSR_SEPC, "sepc", false),
-        CSRTuple(VM::CSR_SCAUSE, "scause", false),
-        CSRTuple(VM::CSR_STVAL, "stval", false),
-        CSRTuple(VM::CSR_SIP, "sip", false),
-        CSRTuple(VM::CSR_SATP, "satp", false),
-        CSRTuple(VM::CSR_MVENDORID, "mvendorid", false),
-        CSRTuple(VM::CSR_MARCHID, "marchid", false),
-        CSRTuple(VM::CSR_MIMPID, "mimpid", false),
-        CSRTuple(VM::CSR_MHARTID, "mhartid", false),
-        CSRTuple(VM::CSR_MCONFIGPTR, "mconfigptr", false),
-        CSRTuple(VM::CSR_MSTATUS, "mstatus", false),
-        CSRTuple(VM::CSR_MISA, "misa", true),
-        CSRTuple(VM::CSR_MEDELEG, "medeleg", false),
-        CSRTuple(VM::CSR_MIDELEG, "mideleg", false),
-        CSRTuple(VM::CSR_MIE, "mie", false),
-        CSRTuple(VM::CSR_MTVEC, "mtvec", false),
-        CSRTuple(VM::CSR_MSTATUSH, "mstatush", false),
-        CSRTuple(VM::CSR_MSCRATCH, "mscratch", false),
-        CSRTuple(VM::CSR_MEPC, "mepc", false),
-        CSRTuple(VM::CSR_MCAUSE, "mcause", false),
-        CSRTuple(VM::CSR_MTVAL, "mtval", false),
-        CSRTuple(VM::CSR_MIP, "mip", false),
-        CSRTuple(VM::CSR_MTINST, "mtinst", false),
-        CSRTuple(VM::CSR_MTVAL2, "mtval2", false),
-        CSRTuple(VM::CSR_MENVCFG, "menvcfg", false),
-        CSRTuple(VM::CSR_MENVCFGH, "menvcfgh", false),
-        CSRTuple(VM::CSR_MSECCFG, "mseccfg", false),
-        CSRTuple(VM::CSR_MSECCFGH, "mseccfgh", false),
-        CSRTuple(VM::CSR_MCYCLE, "mcycle", false),
-        CSRTuple(VM::CSR_MINSTRET, "minstret", false),
-        CSRTuple(VM::CSR_MCYCLEH, "mcycleh", false),
-        CSRTuple(VM::CSR_MINSTRETH, "minstreth", false),
+        CSRTuple(VM::CSR_FFLAGS, "fflags"),
+        CSRTuple(VM::CSR_FRM, "frm"),
+        CSRTuple(VM::CSR_FCSR, "fcsr"),
+        CSRTuple(VM::CSR_CYCLE, "cycle"),
+        CSRTuple(VM::CSR_TIME, "time"),
+        CSRTuple(VM::CSR_INSTRET, "instret"),
+        CSRTuple(VM::CSR_CYCLEH, "cycleh"),
+        CSRTuple(VM::CSR_TIMEH, "timeh"),
+        CSRTuple(VM::CSR_INSTRETH, "instreth"),
+        CSRTuple(VM::CSR_SSTATUS, "sstatus"),
+        CSRTuple(VM::CSR_SIE, "sie"),
+        CSRTuple(VM::CSR_STVEC, "stvec"),
+        CSRTuple(VM::CSR_SENVCFG, "senvcfg"),
+        CSRTuple(VM::CSR_SSCRATCH, "sscratch"),
+        CSRTuple(VM::CSR_SEPC, "sepc"),
+        CSRTuple(VM::CSR_SCAUSE, "scause"),
+        CSRTuple(VM::CSR_STVAL, "stval"),
+        CSRTuple(VM::CSR_SIP, "sip"),
+        CSRTuple(VM::CSR_SATP, "satp"),
+        CSRTuple(VM::CSR_MVENDORID, "mvendorid"),
+        CSRTuple(VM::CSR_MARCHID, "marchid"),
+        CSRTuple(VM::CSR_MIMPID, "mimpid"),
+        CSRTuple(VM::CSR_MHARTID, "mhartid"),
+        CSRTuple(VM::CSR_MCONFIGPTR, "mconfigptr"),
+        CSRTuple(VM::CSR_MSTATUS, "mstatus"),
+        CSRTuple(VM::CSR_MISA, "misa"),
+        CSRTuple(VM::CSR_MEDELEG, "medeleg"),
+        CSRTuple(VM::CSR_MIDELEG, "mideleg"),
+        CSRTuple(VM::CSR_MIE, "mie"),
+        CSRTuple(VM::CSR_MTVEC, "mtvec"),
+        CSRTuple(VM::CSR_MSTATUSH, "mstatush"),
+        CSRTuple(VM::CSR_MSCRATCH, "mscratch"),
+        CSRTuple(VM::CSR_MEPC, "mepc"),
+        CSRTuple(VM::CSR_MCAUSE, "mcause"),
+        CSRTuple(VM::CSR_MTVAL, "mtval"),
+        CSRTuple(VM::CSR_MIP, "mip"),
+        CSRTuple(VM::CSR_MTINST, "mtinst"),
+        CSRTuple(VM::CSR_MTVAL2, "mtval2"),
+        CSRTuple(VM::CSR_MENVCFG, "menvcfg"),
+        CSRTuple(VM::CSR_MENVCFGH, "menvcfgh"),
+        CSRTuple(VM::CSR_MSECCFG, "mseccfg"),
+        CSRTuple(VM::CSR_MSECCFGH, "mseccfgh"),
+        CSRTuple(VM::CSR_MCYCLE, "mcycle"),
+        CSRTuple(VM::CSR_MINSTRET, "minstret"),
+        CSRTuple(VM::CSR_MCYCLEH, "mcycleh"),
+        CSRTuple(VM::CSR_MINSTRETH, "minstreth"),
     };
 
     if (ImGui::Begin("CSRs")) {
-        std::unordered_map<Word, Word> csrs;
+        std::unordered_map<Long, Long> csrs;
         vm->GetCSRSnapshot(csrs);
 
-        for (const auto& [csr, name, binary] : csrs_names) {
-            if (binary)
-                ImGui::Text("%-16s0x%-3x : 0x%08x (%s)", name.c_str(), csr, csrs[csr], std::format("{:b}", csrs[csr]).c_str());
-            else
-                ImGui::Text("%-16s0x%-3x : 0x%08x (%u)", name.c_str(), csr, csrs[csr], csrs[csr]);
+        for (const auto& [csr, name] : csrs_names) {
+            auto fmt = std::format("{:<16}0x{:<3x} : 0x{:0>16x} ({})", name, csr, csrs[csr], csrs[csr]);
+            ImGui::Text("%s", fmt.c_str());
         }
     }
 

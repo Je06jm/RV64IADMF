@@ -1,18 +1,12 @@
 #include "printf.h"
 #include "input.h"
 #include "machine.h"
-#include "virt_mem.h"
 
 int main(int argc, const char** argv) {
-    //phys_setup();
-
-    virt_mem_setup();
-
-    printf("Hello!\n");
-
-    printf("This is the Supervisor!\n");
-
+    printf("Found %i args\n", argc);
+    for (int i = 0; i < argc; i++) {
+        printf("Arg %i: %s\n", i, argv[i]);
+    }
     while (1) {}
-    
     return 0;
 }

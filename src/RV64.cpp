@@ -161,12 +161,12 @@ void RVInstruction::SetupCSRNames() {
 RVInstruction::operator std::string() {
     std::string s;
 
-    union SU32 {
-        Word u;
-        int32_t s;
+    union SU64 {
+        Long u;
+        SLong s;
     };
 
-    SU32 imm;
+    SU64 imm;
     imm.u = immediate;
 
     auto s_rs2 = register_names[rs2];
@@ -280,15 +280,15 @@ RVInstruction::operator std::string() {
             break;
         
         case Type::SLLI:
-            s = std::format("SLLI {}, {}, {}", s_rd, s_rs1, rs2);
+            s = std::format("SLLI {}, {}, {}", s_rd, s_rs1, imm.u & 0b111111);
             break;
         
         case Type::SRLI:
-            s = std::format("SRLI {}, {}, {}", s_rd, s_rs1, rs2);
+            s = std::format("SRLI {}, {}, {}", s_rd, s_rs1, imm.u & 0b11111);
             break;
         
         case Type::SRAI:
-            s = std::format("SRAI {}, {}, {}", s_rd, s_rs1, rs2);
+            s = std::format("SRAI {}, {}, {}", s_rd, s_rs1, imm.u & 0b11111);
             break;
         
         case Type::ADD:
@@ -1071,12 +1071,14 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
             rv.type = RVInstruction::Type::LUI;
             rv.rd = iw.U.rd;
             rv.immediate = iw.U.imm << 12;
+            sign_extend_at = 31;
             break;
         
         case OP_AUIPC:
             rv.type = RVInstruction::Type::AUIPC;
             rv.rd = iw.U.rd;
             rv.immediate = iw.U.imm << 12;
+            sign_extend_at = 31;
             break;
         
         case OP_JAL:
@@ -2230,8 +2232,8 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
     }
 
     if (sign_extend_at > 0) {
-        Word sign = -1U << sign_extend_at;
-        if (rv.immediate & (1U << sign_extend_at)) rv.immediate |= sign;
+        Long sign = -1ULL << sign_extend_at;
+        if (rv.immediate & (1ULL << sign_extend_at)) rv.immediate |= sign;
     }
 
     return rv;

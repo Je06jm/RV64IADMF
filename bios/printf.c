@@ -6,43 +6,39 @@
 #include <stdarg.h>
 #include <stddef.h>
 
+void debug_trace(const char* str) {
+    size_t size = 0;
+    while (str[size]) size++;
+    machine_call(MACHINE_CALL_COUT, str, size);
+}
+
 int putc(char c) {
     static char buffer[512];
     static size_t index = 0;
-    static size_t size = 0;
 
     bool flush = false;
-    if (c == 0 && size) flush = true;
-    else if (c == 0) return 0;
-    if (c == '\n') {
-        buffer[index++] = c;
+
+    if (c == 0 && index == 0)
+        return 0;
+    
+    else if ((index + 2) == sizeof(buffer))
         flush = true;
-    }
-    if (c == '\r') {
-        index = 0;
-        return 0;
-    }
-    if (c == '\t') {
-        int spaces = 0;
-        do {
-            buffer[index++] = ' ';
-            spaces++;
-        } while (index % 4);
-        if (index > size) size = index;
-        return spaces;
-    }
+    
+    else if (c == 0)
+        flush = true;
+    
+    else {
+        buffer[index++] = c;
 
-    if (index > size) size = index;
-
+        if (c == '\n')
+            flush = true;
+    }
+    
     if (flush) {
-        buffer[size] = 0;
-        machine_call(MACHINE_CALL_COUT, buffer, size);
+        machine_call(MACHINE_CALL_COUT, buffer, index);
         index = 0;
-        size = 0;
-        return 0;
     }
 
-    buffer[index++] = c;
     return 1;
 }
 

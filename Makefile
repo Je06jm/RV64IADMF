@@ -34,7 +34,7 @@ BIOS_OBJ_COPY = llvm-objcopy
 BIOS_OBJ_COPY_FLAGS = -O binary
 
 BIOS_CC = clang
-BIOS_CC_FLAGS = -target riscv32 -march=rv32imafd -ffreestanding
+BIOS_CC_FLAGS = -target riscv64 -march=rv64imafd -ffreestanding
 
 BIOS_CC_HEADERS = $(wildcard bios/*.h)
 
@@ -73,8 +73,8 @@ all: library $(APP_OBJS)  $(APP_CC_OBJS)
 debug: CXX_FLAGS += $(APP_FLAGS)
 debug: debug_library
 debug: CXX_FLAGS += -g
-debug: $(APP_OBJS)
-	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(CC_OBJS) $(LD_FLAGS) -O2
+debug: $(APP_OBJS) $(APP_CC_OBJS)
+	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(APP_CC_OBJS) $(LD_FLAGS) -O2
 
 bios: $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS) $(BIOS_CC_HEADERS)
 	$(BIOS_LD) $(BIOS_LD_FLAGS) -o $(BIOS).elf $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS)

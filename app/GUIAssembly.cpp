@@ -38,13 +38,20 @@ void GUIAssembly::Draw() {
         for (Address addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
             if (instrs[i].second) {
                 RVInstruction instr = RVInstruction::FromUInt32(instrs[i].first);
+                std::string s_addr;
+                if (vm->Is32BitMode())
+                    s_addr = std::format("0x{:0>8x}", addr);
+                
+                else
+                    s_addr = std::format("0x{:0>16x}", addr);
+
                 if (addr == pc) {
-                    ImGui::TextColored(gui_pc_highlight_color, "-> 0x%08x %s", addr, std::string(instr).c_str());
+                    ImGui::TextColored(gui_pc_highlight_color, "-> %s %s", s_addr.c_str(), std::string(instr).c_str());
                     if (needs_scroll) ImGui::SetScrollHereY();
                 } else if (vm->IsBreakPoint(addr)) {
-                    ImGui::TextColored(gui_break_highlight_color, "   0x%08x %s", addr, std::string(instr).c_str());
+                    ImGui::TextColored(gui_break_highlight_color, "   %s %s", s_addr.c_str(), std::string(instr).c_str());
                 } else {
-                    ImGui::Text("   0x%08x %s", addr, std::string(instr).c_str());
+                    ImGui::Text("   %s %s", s_addr.c_str(), std::string(instr).c_str());
                 }
             }
             else {

@@ -129,15 +129,15 @@ void GDBServer::Run(uint16_t port) {
                 }
                 
                 case 'g': {
-                    std::array<uint32_t, VM::REGISTER_COUNT> regs;
+                    std::array<VM::Reg, VM::REGISTER_COUNT> regs;
                     std::array<Float, VM::REGISTER_COUNT> fregs;
-                    uint32_t pc;
+                    Long pc;
 
                     vm->GetSnapshot(regs, fregs, pc);
 
                     std::string packet;
                     for (auto reg : regs)
-                        packet += std::format("{:0>8x}", reg);
+                        packet += std::format("{:0>16x}", reg.u64);
                     
                     for (auto freg : fregs) {
                         if (freg.is_double)
