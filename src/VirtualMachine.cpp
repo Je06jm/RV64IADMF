@@ -601,6 +601,19 @@ bool VirtualMachine::Step(Long steps) {
         return value;
     };
 
+    auto SignExtend = [](SLong value, Long bit) {
+        union S64U64 {
+            Long u;
+            SLong s;
+        };
+        
+        S64U64 v;
+        v.s = value;
+        Long sign = -1ULL << bit;
+        if (v.u & (1ULL << bit)) v.u |= sign;
+        return v.s;
+    };
+
     auto AsSigned32 = [](Word value) {
         union S32U32 {
             Word u;
@@ -1538,6 +1551,120 @@ bool VirtualMachine::Step(Long steps) {
                 else
                     SetRD(lhs % rhs);
 
+                break;
+            }
+
+            case Type::MULW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                SLong lhs = regs[instr.rs1].s32;
+                SLong rhs = regs[instr.rs2].s32;
+
+                auto val = lhs * rhs;
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+
+                regs[instr.rd].s64 = val;
+                break;
+            }
+
+            case Type::DIVW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                SLong lhs = regs[instr.rs1].s32;
+                SLong rhs = regs[instr.rs2].s32;
+
+                SLong val;
+                if (rhs == 0)
+                    val = -1LL;
+                
+                else
+                    val = lhs / rhs;
+                
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+
+                regs[instr.rd].s64 = val;
+                break;
+            }
+
+            case Type::DIVUW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                Long lhs = regs[instr.rs1].u32;
+                Long rhs = regs[instr.rs2].u32;
+
+                Long val;
+                if (rhs == 0)
+                    val = -1ULL;
+                
+                else
+                    val = lhs / rhs;
+                
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+
+                regs[instr.rd].s64 = val;
+                break;
+            }
+
+            case Type::REMW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                SLong lhs = regs[instr.rs1].s32;
+                SLong rhs = regs[instr.rs2].s32;
+
+                SLong val;
+                if (rhs == 0)
+                    val = -1LL;
+                
+                else
+                    val = lhs % rhs;
+                
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+
+                regs[instr.rd].s64 = val;
+                break;
+            }
+
+            case Type::REMUW: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                Long lhs = regs[instr.rs1].u32;
+                Long rhs = regs[instr.rs2].u32;
+
+                Long val;
+                if (rhs == 0)
+                    val = -1ULL;
+                
+                else
+                    val = lhs % rhs;
+                
+                val &= 0xffffffff;
+                val = SignExtend(val, 31);
+
+                regs[instr.rd].u64 = val;
                 break;
             }
             
