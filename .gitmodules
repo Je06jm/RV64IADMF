@@ -2,3 +2,6 @@
 	path = thirdparties/imgui
 	url = https://github.com/ocornut/imgui.git
 	branch = docking
+[submodule "thirdparties/riscv-arch-test"]
+	path = thirdparties/riscv-arch-test
+	url = https://github.com/riscv-non-isa/riscv-arch-test.git
