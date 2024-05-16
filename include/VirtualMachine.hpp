@@ -385,7 +385,12 @@ private:
     
     inline static consteval auto GetLog2(auto value) {
         Long i = 0;
-        while ((1ULL << i) < value) i++;
+        if constexpr (sizeof(value) == sizeof(uint32_t))
+            while ((1U << i) < value) i++;
+        
+        else
+            while ((1ULL << i) < value) i++;
+        
         return i;
     }
 

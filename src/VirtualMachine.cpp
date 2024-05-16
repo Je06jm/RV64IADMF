@@ -595,13 +595,13 @@ VirtualMachine::~VirtualMachine() {
 }
 
 bool VirtualMachine::Step(Long steps) {
-    auto SignExtend = [](Long value, Long bit) {
+    auto SignExtendUnsigned = [](Long value, Long bit) {
         Long sign = -1ULL << bit;
         if (value & (1ULL << bit)) return value | sign;
         return value;
     };
 
-    auto SignExtend = [](SLong value, Long bit) {
+    auto SignExtendSigned = [](SLong value, Long bit) {
         union S64U64 {
             Long u;
             SLong s;
@@ -998,7 +998,7 @@ bool VirtualMachine::Step(Long steps) {
 
                 auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
-                SetRD(SignExtend(memory.ReadByte(translated_address), 7));
+                SetRD(SignExtendUnsigned(memory.ReadByte(translated_address), 7));
                 break;
             }
             
@@ -1008,7 +1008,7 @@ bool VirtualMachine::Step(Long steps) {
 
                 auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
-                SetRD(SignExtend(memory.ReadHalf(translated_address), 15));
+                SetRD(SignExtendUnsigned(memory.ReadHalf(translated_address), 15));
                 break;
             }
             
@@ -1018,7 +1018,7 @@ bool VirtualMachine::Step(Long steps) {
                 
                 auto [translated_address, translation_valid] = TranslateMemoryAddress(addr, false, false);
                 if (!translation_valid) continue;
-                SetRD(SignExtend(memory.ReadWord(translated_address), 31));
+                SetRD(SignExtendUnsigned(memory.ReadWord(translated_address), 31));
                 break;
             }
 
@@ -1264,7 +1264,7 @@ bool VirtualMachine::Step(Long steps) {
 
                 Long val = regs[instr.rs1].u64 + instr.immediate;
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1279,7 +1279,7 @@ bool VirtualMachine::Step(Long steps) {
                 auto shift = instr.immediate & 0b111111;
                 Long val = regs[instr.rs1].u64 << shift;
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1292,9 +1292,10 @@ bool VirtualMachine::Step(Long steps) {
                 }
 
                 auto shift = instr.immediate & 0b111111;
-                Long val = regs[instr.rs1].u64 >> shift;
+                Long val = regs[instr.rs1].u64;
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val >>= shift;
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1312,7 +1313,7 @@ bool VirtualMachine::Step(Long steps) {
                     val |= -1ULL << (64 - shift);
 
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1326,7 +1327,7 @@ bool VirtualMachine::Step(Long steps) {
 
                 Long val = regs[instr.rs1].u64 + regs[instr.rs2].u64;
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1340,7 +1341,7 @@ bool VirtualMachine::Step(Long steps) {
 
                 Long val = regs[instr.rs1].u64 - regs[instr.rs2].u64;
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1355,7 +1356,7 @@ bool VirtualMachine::Step(Long steps) {
                 auto shift = regs[instr.rs2].u64 & 0b111111;
                 Long val = regs[instr.rs1].u64 << shift;
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1370,7 +1371,7 @@ bool VirtualMachine::Step(Long steps) {
                 auto shift = regs[instr.rs2].u64 & 0b111111;
                 Long val = regs[instr.rs1].u64 >> shift;
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1388,7 +1389,7 @@ bool VirtualMachine::Step(Long steps) {
                     val |= -1ULL << (64 - shift);
                 
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
             }
@@ -1566,7 +1567,7 @@ bool VirtualMachine::Step(Long steps) {
 
                 auto val = lhs * rhs;
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendSigned(val, 31);
 
                 regs[instr.rd].s64 = val;
                 break;
@@ -1590,7 +1591,7 @@ bool VirtualMachine::Step(Long steps) {
                     val = lhs / rhs;
                 
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendSigned(val, 31);
 
                 regs[instr.rd].s64 = val;
                 break;
@@ -1614,7 +1615,7 @@ bool VirtualMachine::Step(Long steps) {
                     val = lhs / rhs;
                 
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
 
                 regs[instr.rd].s64 = val;
                 break;
@@ -1638,7 +1639,7 @@ bool VirtualMachine::Step(Long steps) {
                     val = lhs % rhs;
                 
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendSigned(val, 31);
 
                 regs[instr.rd].s64 = val;
                 break;
@@ -1662,7 +1663,7 @@ bool VirtualMachine::Step(Long steps) {
                     val = lhs % rhs;
                 
                 val &= 0xffffffff;
-                val = SignExtend(val, 31);
+                val = SignExtendUnsigned(val, 31);
 
                 regs[instr.rd].u64 = val;
                 break;
@@ -1763,6 +1764,104 @@ bool VirtualMachine::Step(Long steps) {
                 if (!translation_valid) continue;
 
                 SetRD(memory.AtomicMaxUW(translated_address, RS2()));
+                break;
+            }
+
+            case Type::LR_D: {
+                if (instr.rs2 != 0) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false);
+                if (!translation_valid) continue;
+
+                SetRD(memory.ReadLongReserved(translated_address, csrs[CSR_MHARTID]));
+                break;
+            }
+
+            case Type::SC_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), true, false);
+                if (!translation_valid) continue;
+
+                if (memory.WriteLongConditional(translated_address, RS2(), csrs[CSR_MHARTID]))
+                    SetRD(0);
+                
+                else
+                    SetRD(1);
+                
+                break;
+            }
+
+            case Type::AMOSWAP_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicSwapL(translated_address, RS2()));
+                break;
+            }
+
+            case Type::AMOADD_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicAddL(translated_address, RS2()));
+                break;
+            }
+
+            case Type::AMOXOR_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicXorL(translated_address, RS2()));
+                break;
+            }
+
+            case Type::AMOAND_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicAndL(translated_address, RS2()));
+                break;
+            }
+
+            case Type::AMOOR_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicOrL(translated_address, RS2()));
+                break;
+            }
+
+            case Type::AMOMIN_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicMinL(translated_address, RS2()));
+                break;
+            }
+
+            case Type::AMOMAX_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicMaxL(translated_address, RS2()));
+                break;
+            }
+
+            case Type::AMOMINU_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicMinUL(translated_address, RS2()));
+                break;
+            }
+
+            case Type::AMOMAXU_D: {
+                auto [translated_address, translation_valid] = TranslateMemoryAddress(RS1(), false, false, true);
+                if (!translation_valid) continue;
+
+                SetRD(memory.AtomicMaxUL(translated_address, RS2()));
                 break;
             }
             
@@ -2164,8 +2263,7 @@ bool VirtualMachine::Step(Long steps) {
                     result = AsUnsigned32(static_cast<SWord>(val));
                 }
 
-                regs[instr.rd].u32 = result;
-                regs[instr.rd].is_u64 = 0;
+                regs[instr.rd].u64 = SignExtendUnsigned(result, 31);
                 break;
             }
             
@@ -2198,14 +2296,13 @@ bool VirtualMachine::Step(Long steps) {
                     result = val;
                 }
 
-                regs[instr.rd].u32 = result;
-                regs[instr.rd].is_u64 = 0;
+                regs[instr.rd].u64 = SignExtendUnsigned(result, 31);
                 break;
             }
             
             case Type::FMV_X_W:
                 regs[instr.rd].u32 = ToUInt32(fregs[instr.rs1]);
-                regs[instr.rd].is_u64 = 0;
+                regs[instr.rd].u64 = SignExtendUnsigned(regs[instr.rd].u64, 31);
                 break;
             
             case Type::FEQ_S: {
@@ -2342,6 +2439,122 @@ bool VirtualMachine::Step(Long steps) {
                 fregs[instr.rd].u64 = 0;
                 fregs[instr.rd].u32 = regs[instr.rs1].u32;
                 break;
+            
+            case Type::FCVT_L_S: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                if (!ChangeRoundingMode(instr.rm)) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                bool is_inf, is_nan, is_qnan;
+                ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
+
+                Long result;
+
+                if (is_inf) {
+                    if (fregs[instr.rs1].f < 0) result = -1ULL;
+                    else result = 0x7fffffffffffffff;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else if (is_nan || is_qnan) {
+                    result = 0x7fffffffffffffff;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else {
+                    SLong val = fregs[instr.rs1].f;
+                    if (val != fregs[instr.rs1].f)
+                        SetFloatFlags(false, false, false, false, true);
+                    
+                    result = AsUnsigned64(val);
+                }
+
+                regs[instr.rd].u64 = result;
+                break;
+            }
+
+            case Type::FCVT_LU_S: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                if (!ChangeRoundingMode(instr.rm)) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                bool is_inf, is_nan, is_qnan;
+                ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
+                
+                Long result;
+
+                if (is_inf) {
+                    if (fregs[instr.rs1].f < 0) result = 0;
+                    else result = -1ULL;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else if (is_nan || is_qnan) {
+                    result = -1ULL;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else {
+                    Long val = fregs[instr.rs1].f;
+                    if (val != fregs[instr.rs1].f)
+                        SetFloatFlags(false, false, false, false, true);
+                    
+                    result = val;
+                }
+
+                regs[instr.rd].u64 = result;
+                break;
+            }
+
+            case Type::FCVT_S_L: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
+                SLong val = AsSigned64(regs[instr.rs1].u64);
+
+                fregs[instr.rd].f = val;
+                if (fregs[instr.rd].f != val)
+                    SetFloatFlags(true, false, false, false, false);
+                
+                break;
+            }
+
+            case Type::FCVT_S_LU: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
+                Long val = regs[instr.rs1].u64;
+
+                fregs[instr.rd].f = val;
+                if (fregs[instr.rd].f != val)
+                    SetFloatFlags(true, false, false, false, false);
+                
+                break;
+            }
             
             case Type::FLD: {
                 mstatus.FS = FS_DIRTY;
@@ -2949,6 +3162,142 @@ bool VirtualMachine::Step(Long steps) {
                 
                 break;
             
+            case Type::FCVT_L_D: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                if (!ChangeRoundingMode(instr.rm)) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                bool is_inf, is_nan, is_qnan;
+                ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
+
+                Long result;
+
+                if (is_inf) {
+                    if (fregs[instr.rs1].d < 0) result = -1ULL;
+                    else result = 0x7fffffffffffffff;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else if (is_nan || is_qnan) {
+                    result = 0x7fffffffffffffff;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else {
+                    SLong val = fregs[instr.rs1].d;
+                    if (val != fregs[instr.rs1].d)
+                        SetFloatFlags(false, false, false, false, true);
+                    
+                    result = AsUnsigned64(val);
+                }
+
+                regs[instr.rd].u64 = result;
+                break;
+            }
+
+            case Type::FCVT_LU_D: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+                
+                if (!ChangeRoundingMode(instr.rm)) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                bool is_inf, is_nan, is_qnan;
+                ClassF64(fregs[instr.rs1], &is_inf, &is_nan, &is_qnan, nullptr, nullptr, nullptr);
+
+                Long result;
+
+                if (is_inf) {
+                    if (fregs[instr.rs1].d < 0) result = 0;
+                    else result = -1ULL;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else if (is_nan || is_qnan) {
+                    result = -1ULL;
+                    SetFloatFlags(false, false, false, false, true);
+                }
+                else {
+                    Long val = fregs[instr.rs1].d;
+                    if (val != fregs[instr.rs1].d)
+                        SetFloatFlags(false, false, false, false, true);
+                    
+                    result = val;
+                }
+
+                regs[instr.rd].u64 = result;
+                break;
+            }
+
+            case Type::FMV_X_D:
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                regs[instr.rd].u64 = ToUInt64(fregs[instr.rs1]);
+                break;
+            
+            case Type::FCVT_D_L: {
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
+                auto val = AsSigned64(regs[instr.rs1].u64);
+
+                fregs[instr.rd].d = val;
+                if (fregs[instr.rd].d != val)
+                    SetFloatFlags(true, false, false, false, false);
+                
+                break;
+            }
+            
+            case Type::FCVT_D_LU:
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+                
+                fregs[instr.rd].d = regs[instr.rs1].u64;
+                if (fregs[instr.rd].d != regs[instr.rs1].u64)
+                    SetFloatFlags(true, false, false, false, false);
+                
+                break;
+            
+            case Type::FMV_D_X:
+                if (Is32BitMode()) {
+                    RaiseException(EXCEPTION_ILLEGAL_INSTRUCTION);
+                    inc_pc = false;
+                    break;
+                }
+
+                mstatus.FS = FS_DIRTY;
+                sstatus.FS = FS_DIRTY;
+
+                fregs[instr.rd].u64 = regs[instr.rs1].u64;
+                break;
+
             case Type::SRET:
                 if (privilege_level == PrivilegeLevel::User) {
                     throw std::runtime_error("Cannot use SRET in user mode");
