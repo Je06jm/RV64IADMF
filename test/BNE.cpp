@@ -35,7 +35,7 @@ DEFINE_TESTCASE(BNE, "BNE") {
 
     STEP_VMS(1);
 
-    ASSERT(vm.GetPC() == (base + 4), "BNE {} != {} did jump. Expected {:x}, got {:x}", sel_rs1, sel_rs2, (base + 4), vm.GetPC());
+    ASSERT(vm.GetPC() == (base + 4), "BNE {} == {} did jump. Expected {:x}, got {:x}", sel_rs1, sel_rs2, (base + 4), vm.GetPC());
 
     if (sel_rs1 == sel_rs2)
         SUCCESS;
@@ -46,7 +46,7 @@ DEFINE_TESTCASE(BNE, "BNE") {
 
     STEP_VMS(1);
 
-    ASSERT(vm.GetPC() == (base + jump), "BNE {} == {} did not jump. Expected {:x}, got {:x}", sel_rs1, sel_rs2, (base + jump), vm.GetPC());
+    ASSERT(vm.GetPC() == (base + jump), "BNE {} != {} did not jump. Expected {:x}, got {:x}", sel_rs1, sel_rs2, (base + jump), vm.GetPC());
 
     SUCCESS;
 }
