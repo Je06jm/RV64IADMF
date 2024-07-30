@@ -249,15 +249,6 @@ struct RVInstruction {
         CUST_STRAP
     };
 
-    static constexpr Byte RM_ROUND_TO_NEAREST_TIES_EVEN = 0b000;
-    static constexpr Byte RM_ROUND_TO_ZERO = 0b001;
-    static constexpr Byte RM_ROUND_DOWN = 0b010;
-    static constexpr Byte RM_ROUND_UP = 0b011;
-    static constexpr Byte RM_ROUND_TO_NEAREST_TIES_MAX_MAGNITUDE = 0b100;
-    static constexpr Byte RM_INVALID0 = 0b101;
-    static constexpr Byte RM_INVALID1 = 0b110;
-    static constexpr Byte RM_DYNAMIC = 0b111;
-
     static constexpr Byte OP_LUI = 0b0110111;
     static constexpr Byte OP_AUIPC = 0b0010111;
     static constexpr Byte OP_JAL = 0b1101111;
