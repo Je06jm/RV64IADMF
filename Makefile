@@ -7,7 +7,7 @@ AR_FLAGS = rvs
 IMGUI_DIR = thirdparties/imgui
 
 CXX = g++
-CXX_FLAGS = -Iinclude -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -std=c++23 -Wall -Wextra -c
+CXX_FLAGS = -Iinclude -I$(IMGUI_DIR) -I$(IMGUI_DIR)/backends -std=c++20 -Wall -Wextra -c
 
 IMGUI = $(IMGUI_DIR)/backends/imgui_impl_glfw.cpp $(IMGUI_DIR)/backends/imgui_impl_opengl3.cpp $(IMGUI_DIR)/misc/cpp/imgui_stdlib.cpp
 CXX_SOURCES = $(wildcard src/*.cpp) $(wildcard thirdparties/imgui/*.cpp) $(IMGUI)
@@ -46,29 +46,15 @@ BIOS_ASM_OBJS = $(patsubst %.S,%.rv_o,$(BIOS_ASM_SOURCES))
 
 BIOS = bios
 
-TEST_LD = ld.lld
-TEST32_LD_FLAGS = -T bios/linker.ld
+TEST_CXX = g++
+TEST_CXX_FLAGS = -Iinclude -std=c++20 -Wall -Wextra -c
 
-TEST_OBJ_COPY = llvm-objcopy
-TEST_OBJ_COPY_FLAGS = -O binary
+TEST_CXX_HEADERS = $(wildcard test/*.hpp)
 
-TEST_CC = clang
-TEST_CC_FLAGS = -target riscv64 -march=rv64imafd -ffreestanding
+TEST_CXX_SOURCES = $(wildcard test/*.cpp)
+TEST_CXX_OBJS = $(patsubst %.cpp,%.t_o,$(TEST_CXX_SOURCES))
 
-TEST_SRC_BASE = thirdparties/riscv-arch-test/riscv-test-suite
-TEST32_SRC_BASE = $(TEST_SRC_BASE)/rv32i_m
-TEST_A = A/src
-TEST_D = D/src
-TEST_F = F/src
-TEST_I = I/src
-TEST_M = M/src
-TESTS = $(TEST_A) $(TEST_D) $(TEST_F) $(TEST_I) $(TEST_M)
-
-TEST32_ASM_SOURCES = $(foreach test,$(TEST32_SRC_BASE)/$(TESTS),$(wildcard $(test)/*))
-TEST64_ASM_SOURCES = $(foreach test,$(TEST64_SRC_BASE)/$(TESTS),$(wildcard $(test)/*))
-
-TEST32_ASM_OBJS = $(patsubst %.S,%.test_rv_o,$(TEST32_ASM_SOURCES))
-TEST64_ASM_OBJS = $(patsubst %.S,%.test_rv_o,$(TEST64_ASM_SOURCES))
+TEST_PROGRAM = test.exe
 
 %.o: %.cpp $(CXX_HEADERS)
 	$(CXX) $(CXX_FLAGS) $< -o $@
@@ -82,8 +68,8 @@ TEST64_ASM_OBJS = $(patsubst %.S,%.test_rv_o,$(TEST64_ASM_SOURCES))
 %.rv_o: %.S $(BIOS_CC_HEADERS)
 	$(BIOS_CC) $(BIOS_CC_FLAGS) -c $< -o $@
 
-%.test_rv_o: %.S
-	$(TEST_CC) $< 
+%.t_o: %.cpp $(TEST_CXX_HEADERS)
+	$(TEST_CXX) $(TEST_CXX_FLAGS) $< -o $@
 
 library: CXX_FLAGS += -O3
 library: $(CXX_OBJS) $(CXX_HEADERS)
@@ -107,7 +93,12 @@ bios: $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS) $(BIOS_CC_HEADERS)
 	$(BIOS_LD) $(BIOS_LD_FLAGS) -o $(BIOS).elf $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS)
 	$(BIOS_OBJ_COPY) $(BIOS_OBJ_COPY_FLAGS) $(BIOS).elf $(BIOS).bin
 
-test: $(TEST32_ASM_OBJS) $(TEST64_ASM_OBJS)
+test: library $(TEST_CXX_OBJS)
+	$(LD) -o $(TEST_PROGRAM) $(TEST_CXX_OBJS) $(LIBRARY) -O3
+
+debug_test: TEST_CXX_FLAGS += -g
+debug_test: debug_library $(TEST_CXX_OBJS)
+	$(LD) -o $(TEST_PROGRAM) $(TEST_CXX_OBJS) $(LIBRARY) -O3
 
 clean:
 	@-rm $(PROGRAM)
@@ -115,6 +106,8 @@ clean:
 	@-rm $(APP_CC_OBJS)
 	@-rm $(APP_OBJS)
 	@-rm $(LIBRARY)
+	@-rm $(TEST_CXX_OBJS)
+	@-rm $(TEST_PROGRAM)
 
 clean_bios:
 	@-rm $(BIOS).elf
