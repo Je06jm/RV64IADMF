@@ -152,11 +152,11 @@ public:
         return error != nullptr;
     }
 
-    TypeValue Value() const {
+    TypeValue& Value() const {
         return *value;
     }
 
-    TypeValue ValueOr(const TypeValue& default_value) const {
+    TypeValue& ValueOr(TypeValue& default_value) const {
         if (HasValue())
             return *value;
         
