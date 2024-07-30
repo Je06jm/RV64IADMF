@@ -61,7 +61,7 @@ DEFINE_TESTCASE(BLT, "BLT") {
 
     STEP_VMS(1);
 
-    ASSERT(vm.GetPC() == (base + 4), "BNE {} > {} did jump. Expected {:x}, got {:x}", rs1.s64, rs2.s64, (base + 4), vm.GetPC());
+    ASSERT(vm.GetPC() == (base + 4), "BNE {} > {} did jump. Expected {:x}, got {:x}", rs2.s64, rs1.s64, (base + 4), vm.GetPC());
 
     SUCCESS;
 }
