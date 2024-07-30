@@ -35,7 +35,7 @@ DEFINE_TESTCASE(BGE, "BGE") {
 
     STEP_VMS(1);
 
-    ASSERT(vm.GetPC() == (base + jump), "BGE {} == {} did not jump. Expected {:x}, got {:x}", sel_rs1, sel_rs2, (base + jump), vm.GetPC());
+    ASSERT(vm.GetPC() == (base + jump), "BGE {} == {} did not jump. Expected {:x}, got {:x}", rs1.s64, rs2.s64, (base + jump), vm.GetPC());
 
     if (sel_rs1 == sel_rs2)
         SUCCESS;
@@ -61,7 +61,7 @@ DEFINE_TESTCASE(BGE, "BGE") {
 
     STEP_VMS(1);
 
-    ASSERT(vm.GetPC() == (base + 4), "BGE {} < {} did jump. Expected {:x}, got {:x}", rs2.s64, rs1.s64, (base + 4), vm.GetPC());
+    ASSERT(vm.GetPC() == (base + 4), "BGE {} < {} did jump. Expected {:x}, got {:x}", rs1.s64, rs2.s64, (base + 4), vm.GetPC());
 
     SUCCESS;
 }
