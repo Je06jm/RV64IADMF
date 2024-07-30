@@ -6,18 +6,17 @@ DEFINE_TESTCASE(LUI, "LUI") {
 
     ADD_RAM(0x1000, 0x1000);
 
-    auto reg = Random<size_t>(0, VirtualMachine::REGISTER_COUNT);
+    auto reg = Random<size_t>(1, VirtualMachine::REGISTER_COUNT);
     auto value = Random<uint64_t>(0, UINT32_MAX);
+
+    value <<= 12;
+    value &= 0xffffffff;
 
     memory.WriteWord(0x1000, RV64_U(
         RVInstruction::OP_LUI,
         reg,
-        static_cast<uint32_t>(value)
+        static_cast<uint32_t>(value >> 12)
     ));
-
-    value <<= 12;
-
-    value &= 0xffffffff;
 
     if (value & 0x80000000LL)
         value |= 0xffffffff00000000LL;
