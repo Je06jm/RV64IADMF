@@ -1,6 +1,6 @@
 #include "Test.hpp"
 
-DEFINE_TESTCASE(LUI, "LUI") {
+DEFINE_TESTCASE(LUI) {
     SETUP_MEMORY;
     SETUP_VM(0x1000);
 

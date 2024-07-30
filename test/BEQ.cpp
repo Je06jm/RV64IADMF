@@ -1,6 +1,6 @@
 #include "Test.hpp"
 
-DEFINE_TESTCASE(BEQ, "BEQ") {
+DEFINE_TESTCASE(BEQ) {
     auto base = Random<Address>(0x1000, 0xffffffff00000000);
     base &= ~3;
 

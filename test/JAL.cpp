@@ -1,6 +1,6 @@
 #include "Test.hpp"
 
-DEFINE_TESTCASE(JAL, "JAL") {
+DEFINE_TESTCASE(JAL) {
     auto base = Random<Address>(0x10000, 0x100000);
     base &= ~3;
 

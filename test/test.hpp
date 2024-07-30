@@ -26,12 +26,12 @@ public:
     static void RunTestCases(size_t iterations = 50);
 };
 
-#define DEFINE_TESTCASE(name, description)\
+#define DEFINE_TESTCASE(name)\
 class __TestCase_##name : public __TestCase {\
 public:\
     __TestCase_##name() : __TestCase(this) {}\
     Expected<bool, std::string> Run() override;\
-    std::string GetDescription() const override { return description; }\
+    std::string GetDescription() const override { return #name; }\
 };\
 __TestCase_##name __TestCase_##name##_Impl;\
 Expected<bool, std::string> __TestCase_##name::Run()

@@ -1,6 +1,6 @@
 #include "Test.hpp"
 
-DEFINE_TESTCASE(AUIPC, "AUIPC") {
+DEFINE_TESTCASE(AUIPC) {
     auto base = Random<Address>(0x1000, 0xffffffffffffe000);
     base &= ~3ULL;
 
