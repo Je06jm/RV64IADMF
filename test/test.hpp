@@ -158,4 +158,17 @@ inline Type Random(Type min, Type max) {
     }
 }
 
+template <typename Type>
+inline Type SignExtend(Type value, auto bit) {
+    if constexpr (sizeof(value) < sizeof(uint64_t)) {
+        if (value & (1U << bit))
+            value |= 0xffffffff << bit;
+    }
+    else if constexpr (sizeof(value) == sizeof(uint64_t)) {
+        if (value & (1ULL << bit))
+            value |= 0xffffffffffffffff << bit;
+    }
+    return value;
+}
+
 #endif
