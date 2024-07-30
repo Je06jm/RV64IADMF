@@ -3,6 +3,7 @@
 
 #include "Memory.hpp"
 #include "Float.hpp"
+#include "Expected.hpp"
 
 #include <cstdint>
 #include <array>
@@ -12,7 +13,7 @@
 #include <mutex>
 #include <memory>
 #include <string>
-#include <expected>
+#include <format>
 #include <stdexcept>
 #include <unordered_map>
 
@@ -534,17 +535,17 @@ public:
     void GetSnapshot(std::array<Reg, REGISTER_COUNT>& registers, std::array<Float, REGISTER_COUNT>& fregisters, Long& pc);
     void GetCSRSnapshot(std::unordered_map<Long, Long>& csrs) const;
 
-    inline std::expected<Reg&, std::range_error> GetRegister(size_t reg) {
+    inline Expected<Reg&, std::range_error> GetRegister(size_t reg) {
         if (reg >= REGISTER_COUNT) {
-            return std::unexpected(std::range_error(std::format("Could not get register {}. Max is {}", reg, REGISTER_COUNT)));
+            return Unexpected<std::range_error>(std::range_error(std::format("Could not get register {}. Max is {}", reg, REGISTER_COUNT)));
         }
 
         return regs[reg];
     }
 
-    inline std::expected<Float&, std::range_error> GetFloatRegister(size_t reg) {
+    inline Expected<Float&, std::range_error> GetFloatRegister(size_t reg) {
         if (reg >= REGISTER_COUNT) {
-            return std::unexpected(std::range_error(std::format("Could not get float register {}. Max is {}", reg, REGISTER_COUNT)));
+            return Unexpected<std::range_error>(std::range_error(std::format("Could not get float register {}. Max is {}", reg, REGISTER_COUNT)));
         }
 
         return fregs[reg];
