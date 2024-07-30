@@ -23,7 +23,7 @@ public:
 
     virtual std::string GetDescription() const = 0;
 
-    static void RunTestCases(size_t iterations = 20);
+    static void RunTestCases(size_t iterations = 50);
 };
 
 #define DEFINE_TESTCASE(name, description)\
