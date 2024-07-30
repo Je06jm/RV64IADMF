@@ -22,6 +22,9 @@ using Hart = uint64_t;
 #undef LONG_MIN
 #undef LONG_MAX
 
+constexpr Address ADDRESS_MIN = 0;
+constexpr Address ADDRESS_MAX = UINT64_MAX;
+
 constexpr Long LONG_MIN = 0;
 constexpr Long LONG_MAX = UINT64_MAX;
 
@@ -33,6 +36,9 @@ constexpr Half HALF_MAX = UINT16_MAX;
 
 constexpr Byte BYTE_MIN = 0;
 constexpr Byte BYTE_MAX = UINT8_MAX;
+
+constexpr SAddress SADDRESS_MIN = INT64_MIN;
+constexpr SAddress SADDRESS_MAX = INT64_MAX;
 
 constexpr SLong SLONG_MIN = INT64_MIN;
 constexpr SLong SLONG_MAX = INT64_MAX;
