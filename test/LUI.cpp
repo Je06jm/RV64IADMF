@@ -6,11 +6,12 @@ DEFINE_TESTCASE(LUI, "LUI") {
 
     ADD_RAM(0x1000, 0x1000);
 
+    auto reg = Random<size_t>(0, VirtualMachine::REGISTER_COUNT);
     auto value = Random<uint64_t>(0, UINT32_MAX);
 
     memory.WriteWord(0x1000, RV64_U(
         RVInstruction::OP_LUI,
-        VirtualMachine::REG_A0,
+        reg,
         static_cast<uint32_t>(value)
     ));
 
@@ -23,8 +24,8 @@ DEFINE_TESTCASE(LUI, "LUI") {
 
     STEP_VMS(1);
 
-    auto& reg = vm.GetRegister(VirtualMachine::REG_A0).Value();
-    ASSERT(reg.u64 == value, "Produces the wrong result. Expecting {:x}, got {:x}", value, reg.u64);
+    auto& reg_val = vm.GetRegister(reg).Value();
+    ASSERT(reg_val.u64 == value, "Produces the wrong result. Expecting {:x} in register {}, got {:x}", value, reg, reg_val.u64);
 
     SUCCESS;
 }
