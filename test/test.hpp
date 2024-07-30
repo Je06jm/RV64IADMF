@@ -6,6 +6,7 @@
 #include <iostream>
 #include <format>
 #include <string>
+#include <type_traits>
 
 #include <VirtualMachine.hpp>
 #include <Expected.hpp>
@@ -22,7 +23,7 @@ public:
 
     virtual std::string GetDescription() const = 0;
 
-    static void RunTestCases();
+    static void RunTestCases(size_t iterations = 20);
 };
 
 #define DEFINE_TESTCASE(name, description)\
@@ -80,15 +81,15 @@ Expected<bool, std::string> __TestCase_##name::Run()
         cur_vm.Step(steps);
 
 #define SUCCESS return true;
-#define FAILURE(why) return Unexpected<std::string>(std::string(why));
+#define FAILURE(...) return Unexpected<std::string>(std::format(__VA_ARGS__));
 
 #ifdef ASSERT
 #undef ASSERT
 #endif
 
-#define ASSERT(cond, fail_why)\
+#define ASSERT(cond, ...)\
     if (!(cond))\
-        FAILURE(fail_why);
+        FAILURE(__VA_ARGS__);
 
 inline Word RV64_R(auto opcode, auto rd, auto funct3, auto rs1, auto rs2, auto funct7) {
     RVInstructionWord iw;
@@ -130,6 +131,31 @@ inline Word RV64_J(auto opcode, auto rd, auto imm) {
     RVInstructionWord iw;
     iw.J = {opcode, rd, imm >> 12, imm >> 11, imm >> 1, imm >> 20};
     return iw.raw;
+}
+
+size_t RandomInt();
+
+template <typename Type>
+inline Type Random(Type min, Type max) {
+    if constexpr (std::is_floating_point_v<Type>) {
+        long double num = RandomInt() / static_cast<long double>(UINT64_MAX);
+        return (num * (max - min)) + min;
+    }
+    else if constexpr (std::is_integral_v<Type>) {
+        size_t num = RandomInt();
+
+        if constexpr (std::is_signed_v<Type>) {
+            num &= ~(1ULL << (sizeof(size_t) * 8 - 1));
+            ssize_t snum = num;
+            return (snum - min) % (max - min) + min;
+        }
+        else {
+            return (num - min) % (max - min) + min;
+        }
+    }
+    else {
+        static_assert(false);
+    }
 }
 
 #endif
