@@ -18,13 +18,12 @@ DEFINE_TESTCASE(LUI, "LUI") {
         static_cast<uint32_t>(value >> 12)
     ));
 
-    if (value & 0x80000000LL)
-        value |= 0xffffffff00000000LL;
+    value = SignExtend(value, 31);
 
     STEP_VMS(1);
 
     auto& reg_val = vm.GetRegister(reg).Value();
-    ASSERT(reg_val.u64 == value, "Produces the wrong result. Expecting {:x} in register {}, got {:x}", value, reg, reg_val.u64);
+    ASSERT(reg_val.u64 == value, "Expecting {:x} in register {}, got {:x}", value, reg, reg_val.u64);
 
     SUCCESS;
 }
