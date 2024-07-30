@@ -895,7 +895,6 @@ bool Memory::WriteLongConditional(Address address, Long value, Hart hart_id) {
     }
 
     if (reservations[hart_id] != (address & ~0b11)) {
-        auto addr = reservations[hart_id];
         lock.unlock();
         return false;
     }
@@ -916,7 +915,6 @@ bool Memory::WriteWordConditional(Address address, Word value, Hart hart_id) {
     }
 
     if (reservations[hart_id] != (address & ~0b11)) {
-        auto addr = reservations[hart_id];
         lock.unlock();
         return false;
     }

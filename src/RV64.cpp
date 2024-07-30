@@ -1008,7 +1008,11 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
                             break;
                     }
                     break;
+                
+                default:
+                    break;
             }
+            break;
 
         case OP_MATH:
             rv.rd = iw.R.rd;
@@ -1219,7 +1223,11 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
                     if (iw.R.funct7 != FUNCT7_REMU) break;
                     rv.type = RVInstruction::Type::REMUW;
                     break;
+                
+                default:
+                    break;
             }
+            break;
 
         case OP_FENCE:
             if (iw.I.funct3 != FUNCT3_FENCE) break;

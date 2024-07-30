@@ -337,8 +337,8 @@ void VirtualMachine::RaiseSupervisorTrap(Long cause) {
 
 std::pair<VirtualMachine::TLBEntry, bool> VirtualMachine::GetTLBLookup(Address virt_addr, bool bypass_cache, bool is_amo) {
     // TODO Fix this!
-    constexpr auto KB_OFFSET_BITS = GetLog2(0x1000);
-    constexpr auto MB_OFFSET_BITS = GetLog2(0x200000);
+    constexpr auto KB_OFFSET_BITS = GetLog2(0x1000U);
+    constexpr auto MB_OFFSET_BITS = GetLog2(0x200000U);
 
     auto kb_tag = (virt_addr & ~((1ULL << KB_OFFSET_BITS) - 1)) >> 1;
     auto mb_tag = (virt_addr & ~((1ULL << MB_OFFSET_BITS) - 1)) >> 1;

@@ -386,10 +386,14 @@ private:
 
     static constexpr size_t TLB_CACHE_SIZE = 16;
     
-    inline static consteval auto GetLog2(auto value) {
+    template <typename Type>
+    inline static consteval Type GetLog2(Type value) {
+        static_assert(!std::is_signed_v<Type>);
+        
         Long i = 0;
-        if constexpr (sizeof(value) == sizeof(uint32_t))
+        if constexpr (sizeof(value) == sizeof(uint32_t)) {
             while ((1U << i) < value) i++;
+        }
         
         else
             while ((1ULL << i) < value) i++;

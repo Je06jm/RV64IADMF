@@ -91,43 +91,43 @@ Expected<bool, std::string> __TestCase_##name::Run()
     if (!(cond))\
         FAILURE(__VA_ARGS__);
 
-inline Word RV64_R(auto opcode, auto rd, auto funct3, auto rs1, auto rs2, auto funct7) {
+inline Word RV64_R(Word opcode, Word rd, Word funct3, Word rs1, Word rs2, Word funct7) {
     RVInstructionWord iw;
     iw.R = {opcode, rd, funct3, rs1, rs2, funct7};
     return iw.raw;
 }
 
-inline Word RV64_R4(auto opcode, auto rd, auto funct3, auto rs1, auto rs2, auto funct2, auto rs3) {
+inline Word RV64_R4(Word opcode, Word rd, Word funct3, Word rs1, Word rs2, Word funct2, Word rs3) {
     RVInstructionWord iw;
     iw.R4 = {opcode, rd, funct3, rs1, rs2, funct2, rs3};
     return iw.raw;
 }
 
-inline Word RV64_I(auto opcode, auto rd, auto funct3, auto rs1, auto imm) {
+inline Word RV64_I(Word opcode, Word rd, Word funct3, Word rs1, Word imm) {
     RVInstructionWord iw;
     iw.I = {opcode, rd, funct3, rs1, imm};
     return iw.raw;
 }
 
-inline Word RV64_S(auto opcode, auto funct3, auto rs1, auto rs2, auto imm) {
+inline Word RV64_S(Word opcode, Word funct3, Word rs1, Word rs2, Word imm) {
     RVInstructionWord iw;
     iw.S = {opcode, imm, funct3, rs1, rs2, imm >> 5};
     return iw.raw;
 }
 
-inline Word RV64_B(auto opcode, auto funct3, auto rs1, auto rs2, auto imm) {
+inline Word RV64_B(Word opcode, Word funct3, Word rs1, Word rs2, Word imm) {
     RVInstructionWord iw;
     iw.B = {opcode, imm >> 11, imm >> 1, funct3, rs1, rs2, imm >> 5, imm >> 12};
     return iw.raw;
 }
 
-inline Word RV64_U(auto opcode, auto rd, auto imm) {
+inline Word RV64_U(Word opcode, Word rd, Word imm) {
     RVInstructionWord iw;
     iw.U = {opcode, rd, imm};
     return iw.raw;
 }
 
-inline Word RV64_J(auto opcode, auto rd, auto imm) {
+inline Word RV64_J(Word opcode, Word rd, Word imm) {
     RVInstructionWord iw;
     iw.J = {opcode, rd, imm >> 12, imm >> 11, imm >> 1, imm >> 20};
     return iw.raw;
