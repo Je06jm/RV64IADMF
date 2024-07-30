@@ -101,7 +101,7 @@ void GUIMemoryViewer::Draw() {
                 Address index = i * COLUMNS;
                 Address addr = index + read_address;
 
-                ImGui::Text("0x%08x", addr);
+                ImGui::Text("%llx", addr);
 
                 for (size_t c = 0; c < COLUMNS; c++) {
                     float cell_pos_x = c * style->glyph_width * 2;
@@ -165,7 +165,7 @@ void GUIMemoryViewer::Draw() {
         bool view_button = ImGui::Button("View");
         if (text_input_buffer.empty()) {
             char buffer[16];
-            sprintf(buffer, "%x", read_address);
+            sprintf(buffer, "%llx", read_address);
             text_input_buffer = buffer;
         } else if (view_button || enter) {
             Address aligned_address = read_address;
@@ -181,7 +181,7 @@ void GUIMemoryViewer::Draw() {
             UpdateBuffer();
             
             char buffer[16];
-            sprintf(buffer, "%x", aligned_address);
+            sprintf(buffer, "%llx", aligned_address);
             text_input_buffer = buffer;
         }
     }

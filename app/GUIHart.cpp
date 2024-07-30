@@ -5,8 +5,6 @@
 #include <format>
 
 void GUIHart::Draw() {
-    using VM = VirtualMachine;
-
     auto vm = vms[selected_hart];
 
     if (ImGui::Begin("Hart")) {

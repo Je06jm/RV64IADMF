@@ -33,9 +33,9 @@ void GUIStack::Draw() {
             for (Address addr = window_pc, i = 0; i < WINDOW; addr += 4, i++) {
                 if (values[i].second) {
                     if (addr == sp) {
-                        ImGui::TextColored(gui_sp_highlight_color, "-> 0x%08x : 0x%08x (%i)", addr, values[i].first, values[i].first);
+                        ImGui::TextColored(gui_sp_highlight_color, "-> 0x%08llx : 0x%08x (%i)", addr, values[i].first, values[i].first);
                     } else {
-                        ImGui::Text("   0x%08x : 0x%08x (%i)", addr, values[i].first, values[i].first);
+                        ImGui::Text("   0x%08llx : 0x%08x (%i)", addr, values[i].first, values[i].first);
                     }
                 }
                 else {
