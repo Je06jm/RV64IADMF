@@ -36,6 +36,15 @@ private:
 public:
     ~MemoryFramebuffer();
 
+    Long ReadLong(Address address) const override {
+        return static_cast<Long>(ReadWord(address)) << 32 | static_cast<Long>(ReadWord(address + 4));
+    }
+
+    void WriteLong(Address address, Long value) override {
+        WriteWord(address, static_cast<Word>(value >> 32));
+        WriteWord(address + 4, static_cast<Word>(value));
+    }
+
     Word ReadWord(Address address) const override {
         return word_buffer[CorrectAddress(address)];
     }

@@ -10,12 +10,10 @@ MEMORY
 
 SECTIONS
 {
-    img_begin = .;
-
     .bootstrap :
     {
         *(.bootstrap)
-    }
+    } > ram
     
     .text :
     {
@@ -36,8 +34,6 @@ SECTIONS
     {
         *(.bss)
     } > ram
-
-    img_end = .;
 
     /DISCARD/ :
     {

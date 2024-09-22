@@ -60,6 +60,10 @@ void ECallCIn(Hart, bool is_32_bit_mode, Memory& memory, Regs& regs, FRegs&) {
     else regs[VM::REG_A0].u64 = i;
 }
 
+void ECallGetKey(Hart, bool, Memory&, Regs& regs, FRegs&) {
+    
+}
+
 void ECallStartCPU(Hart hart, bool is_32_bit_mode, Memory&, Regs& regs, FRegs&) {
     Hart target_hart;
 

@@ -10,12 +10,12 @@ MEMORY
 
 SECTIONS
 {
-    img_begin = .;
+    img_begin = 0x1000;
 
     .bootstrap :
     {
         *(.bootstrap)
-    }
+    } > ram
     
     .text :
     {
