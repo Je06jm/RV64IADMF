@@ -171,4 +171,108 @@ inline Type SignExtend(Type value, auto bit) {
     return value;
 }
 
+inline size_t EnsureRegistersAreDifferent(size_t to_keep_same, size_t to_check) {
+    if (to_keep_same != to_check)
+        return to_check;
+    
+    to_check++;
+    if (to_check >= VirtualMachine::REGISTER_COUNT) {
+        to_check = 1;
+    }
+
+    return to_check;
+}
+
+template <typename Type>
+inline auto AsSigned(Type value) {
+    if constexpr (std::is_same_v<Type, Byte>) {
+        union SU8 {
+            Byte u;
+            SByte s;
+        };
+        SU8 su8;
+        su8.u = value;
+        return su8.s;
+    }
+
+    else if constexpr (std::is_same_v<Type, Half>) {
+        union SU16 {
+            Half u;
+            SHalf s;
+        };
+        SU16 su16;
+        su16.u = value;
+        return su16.s;
+    }
+
+    else if constexpr (std::is_same_v<Type, Word>) {
+        union SU32 {
+            Word u;
+            SWord s;
+        };
+        SU32 su32;
+        su32.u = value;
+        return su32.s;
+    }
+
+    else if constexpr (std::is_same_v<Type, Long>) {
+        union SU64 {
+            Long u;
+            SLong s;
+        };
+        SU64 su64;
+        su64.u = value;
+        return su64.s;
+    }
+
+    else
+        return value;
+}
+
+template <typename Type>
+inline auto AsUnsigned(Type value) {
+    if constexpr (std::is_same_v<Type, SByte>) {
+        union SU8 {
+            Byte u;
+            SByte s;
+        };
+        SU8 su8;
+        su8.s = value;
+        return su8.u;
+    }
+
+    else if constexpr (std::is_same_v<Type, SHalf>) {
+        union SU16 {
+            Half u;
+            SHalf s;
+        };
+        SU16 su16;
+        su16.s = value;
+        return su16.u;
+    }
+
+    else if constexpr (std::is_same_v<Type, SWord>) {
+        union SU32 {
+            Word u;
+            SWord s;
+        };
+        SU32 su32;
+        su32.s = value;
+        return su32.u;
+    }
+
+    else if constexpr (std::is_same_v<Type, SLong>) {
+        union SU64 {
+            Long u;
+            SLong s;
+        };
+        SU64 su64;
+        su64.s = value;
+        return su64.u;
+    }
+
+    else
+        return value;
+}
+
 #endif
