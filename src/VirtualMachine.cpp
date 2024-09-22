@@ -1111,12 +1111,11 @@ bool VirtualMachine::Step(Long steps) {
             case Type::SRAI: {
                 auto amount = instr.immediate & 0b111111;
                 auto value = RS1() >> amount;
-                Long sign = -1ULL << amount;
 
-                if (Is32BitMode() && (RS1() & (1ULL << 31)))
-                    value |= sign;
-                else if (!Is32BitMode() && (RS1() & (1ULL << 63)))
-                    value |= sign;
+                if (Is32BitMode() && (RS1() & (1ULL << 31)) && (amount != 0))
+                    value |= -1ULL << (32 - amount);
+                else if (!Is32BitMode() && (RS1() & (1ULL << 63)) && (amount != 0))
+                    value |= -1ULL << (64 - amount);
 
                 SetRD(value);
                 break;
@@ -1157,12 +1156,11 @@ bool VirtualMachine::Step(Long steps) {
             case Type::SRA: {
                 auto amount = RS2() & 0x3f;
                 auto value = RS1() >> amount;
-                Long sign = -1ULL << amount;
 
-                if (Is32BitMode() && (RS1() & (1ULL << 31)))
-                    value |= sign;
-                else if (!Is32BitMode() && (RS1() & (1ULL << 63)))
-                    value |= sign;
+                if (Is32BitMode() && (RS1() & (1ULL << 31)) && (amount != 0))
+                    value |= -1ULL << (32 - amount);
+                else if (!Is32BitMode() && (RS1() & (1ULL << 63)) && (amount != 0))
+                    value |= -1ULL << (64 - amount);
 
                 SetRD(value);
                 break;
