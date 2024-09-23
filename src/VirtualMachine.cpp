@@ -1306,11 +1306,8 @@ bool VirtualMachine::Step(Long steps) {
                 }
 
                 auto shift = instr.immediate & 0b111111;
-                Long val = regs[instr.rs1].u64 >> shift;
-                if (regs[instr.rs1].u64 & (1ULL << 63))
-                    val |= -1ULL << (64 - shift);
-
-                val &= 0xffffffff;
+                Long val = (regs[instr.rs1].u64 & 0xffffffff);
+                val >>= shift;
                 val = SignExtendUnsigned(val, 31);
                 regs[instr.rd].u64 = val;
                 break;
