@@ -1011,7 +1011,7 @@ RVInstruction RVInstruction::FromUInt32(Word instr) {
                     break;
                 
                 case FUNCT3_SHIFT_RIGHT_IMMEDIATE:
-                    switch (rv.immediate >> 5) {
+                    switch (rv.immediate >> 6) {
                         case FUNCT7_SRLI:
                             rv.type = RVInstruction::Type::SRLIW;
                             break;
