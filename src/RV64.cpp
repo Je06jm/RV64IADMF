@@ -362,9 +362,21 @@ RVInstruction::operator std::string() {
         case Type::SLLIW:
             s = std::format("SLLI.W {}, {}, {}", s_rd, s_rs1, s_imm);
             break;
+        
+        case Type::SRLIW:
+            s = std::format("SRLI.W {}, {}, {}", s_rd, s_rs1, s_imm);
+            break;
+        
+        case Type::SRAIW:
+            s = std::format("SRAI.W {}, {}, {}", s_rd, s_rs1, s_imm);
+            break;
+        
+        case Type::ADDW:
+            s = std::format("ADD.W {}, {}, {}", s_rd, s_rs1, s_rs2);
+            break;
 
         case Type::SUBW:
-            s = std::format("SUB.W {}, {}, {}", s_rd, s_rs1, s_imm);
+            s = std::format("SUB.W {}, {}, {}", s_rd, s_rs1, s_rs2);
             break;
         
         case Type::SLLW:
