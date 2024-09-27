@@ -35,7 +35,7 @@ DEFINE_TESTCASE(SRA) {
 
     STEP_VMS(1);
 
-    ASSERT(rd.u64 == expected, " Wrong SRA result. Expected {:x}, got {:x}", expected, rd.u64);
+    ASSERT(rd.u64 == expected, "Wrong SRA result. Expected {:x}, got {:x}", expected, rd.u64);
 
     SUCCESS;
 }
