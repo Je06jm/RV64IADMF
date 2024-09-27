@@ -40,6 +40,12 @@ Long VirtualMachine::ReadCSR(Long csr, bool is_internal_read) {
         return 0;
 
     switch (csr) {
+        case CSR_FFLAGS:
+            return csrs[CSR_FCSR] & CSR_FCSR_FLAGS;
+        
+        case CSR_FRM:
+            return csrs[CSR_FCSR] >> 5;
+
         case CSR_MCYCLE:
         case CSR_CYCLE:
             return static_cast<Long>(cycles);
@@ -116,6 +122,22 @@ void VirtualMachine::WriteCSR(Long csr, Long value) {
         case CSR_SENVCFG:
             return; // Non writable
         
+        case CSR_FFLAGS: {
+            auto last = csrs[CSR_FCSR];
+            last &= ~CSR_FCSR_FLAGS;
+            last |= value & CSR_FCSR_FLAGS;
+            csrs[CSR_FCSR] = last;
+            break;
+        }
+
+        case CSR_FRM: {
+            auto last = csrs[CSR_FCSR];
+            last &= ~(0b111 << 5);
+            last |= (value & 0b111) << 5;
+            csrs[CSR_FCSR] = last;
+            break;
+        }
+
         case CSR_MSTATUS: {
             auto last = mstatus.MPP;
             mstatus.raw &= ~MSTATUS_WRITABLE_BITS;
@@ -503,7 +525,6 @@ void VirtualMachine::Setup() {
 
     // User
 
-    csrs[CSR_FRM] = 0;
     csrs[CSR_CYCLE] = 0;
     csrs[CSR_TIME] = 0;
     csrs[CSR_INSTRET] = 0;
