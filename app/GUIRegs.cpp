@@ -129,10 +129,10 @@ void GUIRegs::Draw() {
 
         for (size_t i = 0; i < VM::REGISTER_COUNT; i++) {
             if (fregs[i].is_double)
-                ImGui::Text("%-10sf%-2u : 0x%016llx (%.8g)", fnames[i].c_str(), static_cast<Word>(i), *reinterpret_cast<Address*>(&fregs[i].d), fregs[i].d);
+                ImGui::Text("%-10sf%-2u : 0x%016llx (%.8g)", fnames[i].c_str(), static_cast<Word>(i), fregs[i].u64, fregs[i].d);
 
             else
-                ImGui::Text("%-10sf%-2u : 0x%08x (%.8g)", fnames[i].c_str(), static_cast<Word>(i), *reinterpret_cast<Word*>(&fregs[i].f), fregs[i].f);
+                ImGui::Text("%-10sf%-2u : 0x%08x (%.8g)", fnames[i].c_str(), static_cast<Word>(i), fregs[i].u32, fregs[i].f);
         }
     }
 
