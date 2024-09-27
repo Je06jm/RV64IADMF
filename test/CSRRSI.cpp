@@ -33,10 +33,10 @@ DEFINE_TESTCASE(CSRRSI) {
     vm.GetCSRSnapshot(csrs_updated);
     auto expected = csrs_original[sel_csr];
 
-    ASSERT(rd.u64 == expected, "Wrong CSRSW result. Expected {:x} in RD {:x}, got {:x}", expected, sel_rd, rd.u64);
+    ASSERT(rd.u64 == expected, "Wrong CSRSSI result. Expected {:x} in RD {:x}, got {:x}", expected, sel_rd, rd.u64);
 
     expected |= sel_rs;
-    ASSERT(csrs_updated[sel_csr] == expected, "Wrong CSRSW result. Expected {:x} in CSR {:x}, got {:x}", expected, sel_csr, csrs_updated[sel_csr]);
+    ASSERT(csrs_updated[sel_csr] == expected, "Wrong CSRSSI result. Expected {:x} in CSR {:x}, got {:x}", expected, sel_csr, csrs_updated[sel_csr]);
 
     SUCCESS;
 }
