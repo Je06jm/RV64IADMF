@@ -755,53 +755,6 @@ bool VirtualMachine::Step(Long steps) {
         if (inexact) csrs[CSR_FCSR] |= CSR_FCSR_NX;
     };
 
-    auto UnsignedMul128 = [](Long lhs, Long rhs) {
-        Long u1 = (lhs & 0xffffffff);
-        Long v1 = (rhs & 0xffffffff);
-        Long t = (u1 & v1);
-        Long w3 = (t & 0xffffffff);
-        Long k = (w3 >> 32);
-
-        lhs >>= 32;
-        t = (lhs * v1) + k;
-        k = (t & 0xffffffff);
-        Long w1 = (t >> 32);
-
-        rhs >>= 32;
-        t = (u1 * rhs) + k;
-        k = (t >> 32);
-
-        return std::pair<Long, Long>((lhs * rhs) + w1 + k, (t << 32) + w3);
-    };
-
-    auto SignedMul128 = [&](SLong lhs, SLong rhs) {
-        bool lhs_neg = lhs < 0;
-        bool rhs_neg = rhs < 0;
-
-        if (lhs_neg) lhs = -lhs;
-        if (rhs_neg) rhs = -rhs;
-
-        auto result = UnsignedMul128(lhs, rhs);
-
-        if (lhs_neg != rhs_neg)
-            return std::pair<Long, Long>(-result.first, -result.second);
-        
-        return result;
-    };
-
-    auto SignedUnsignedMul128 = [&](SLong lhs, Long rhs) {
-        bool lhs_neg = lhs < 0;
-
-        if (lhs_neg) lhs = -lhs;
-
-        auto result = UnsignedMul128(lhs, rhs);
-
-        if (lhs_neg)
-            return std::pair<Long, Long>(-result.first, -result.second);
-        
-        return result;
-    };
-
     ticks += steps;
 
     using Type = RVInstruction::Type;
@@ -1476,8 +1429,9 @@ bool VirtualMachine::Step(Long steps) {
                     SetSignedRD((lhs * rhs) >> 32);
 
                 else {
-                    auto result = SignedMul128(lhs, rhs);
-                    SetSignedRD(result.first);
+                    __int128_t o_lhs = lhs;
+                    __int128_t o_rhs = rhs;
+                    SetSignedRD(static_cast<SLong>((o_lhs * o_rhs) >> 64));
                 }
                 break;
             }
@@ -1490,8 +1444,9 @@ bool VirtualMachine::Step(Long steps) {
                     SetSignedRD((lhs * rhs) >> 32);
 
                 else {
-                    auto result = SignedUnsignedMul128(lhs, rhs);
-                    SetSignedRD(result.first);
+                    __int128_t o_lhs = lhs;
+                    __uint128_t o_rhs = rhs;
+                    SetSignedRD(static_cast<SLong>((o_lhs * o_rhs) >> 64));
                 }
                 break;
             }
@@ -1503,8 +1458,11 @@ bool VirtualMachine::Step(Long steps) {
                 if (Is32BitMode())
                     SetRD((lhs * rhs) >> 32);
                 
-                else
-                    SetRD(lhs * rhs);
+                else {
+                    __uint128_t o_lhs = lhs;
+                    __uint128_t o_rhs = rhs;
+                    SetRD((o_lhs * o_rhs) >> 64);
+                }
                 
                 break;
             }
