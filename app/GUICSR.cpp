@@ -19,9 +19,6 @@ void GUICSR::Draw() {
         CSRTuple(VM::CSR_CYCLE, "cycle"),
         CSRTuple(VM::CSR_TIME, "time"),
         CSRTuple(VM::CSR_INSTRET, "instret"),
-        CSRTuple(VM::CSR_CYCLEH, "cycleh"),
-        CSRTuple(VM::CSR_TIMEH, "timeh"),
-        CSRTuple(VM::CSR_INSTRETH, "instreth"),
         CSRTuple(VM::CSR_SSTATUS, "sstatus"),
         CSRTuple(VM::CSR_SIE, "sie"),
         CSRTuple(VM::CSR_STVEC, "stvec"),
@@ -43,7 +40,6 @@ void GUICSR::Draw() {
         CSRTuple(VM::CSR_MIDELEG, "mideleg"),
         CSRTuple(VM::CSR_MIE, "mie"),
         CSRTuple(VM::CSR_MTVEC, "mtvec"),
-        CSRTuple(VM::CSR_MSTATUSH, "mstatush"),
         CSRTuple(VM::CSR_MSCRATCH, "mscratch"),
         CSRTuple(VM::CSR_MEPC, "mepc"),
         CSRTuple(VM::CSR_MCAUSE, "mcause"),
@@ -52,13 +48,10 @@ void GUICSR::Draw() {
         CSRTuple(VM::CSR_MTINST, "mtinst"),
         CSRTuple(VM::CSR_MTVAL2, "mtval2"),
         CSRTuple(VM::CSR_MENVCFG, "menvcfg"),
-        CSRTuple(VM::CSR_MENVCFGH, "menvcfgh"),
         CSRTuple(VM::CSR_MSECCFG, "mseccfg"),
-        CSRTuple(VM::CSR_MSECCFGH, "mseccfgh"),
         CSRTuple(VM::CSR_MCYCLE, "mcycle"),
         CSRTuple(VM::CSR_MINSTRET, "minstret"),
         CSRTuple(VM::CSR_MCYCLEH, "mcycleh"),
-        CSRTuple(VM::CSR_MINSTRETH, "minstreth"),
     };
 
     if (ImGui::Begin("CSRs")) {
