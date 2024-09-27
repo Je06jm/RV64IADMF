@@ -85,11 +85,6 @@ public:
     static constexpr Half CSR_PERF_COUNTER_MAX = 32;
     static constexpr Half CSR_HPMCOUNTER = 0xc03;
 
-    static constexpr Half CSR_CYCLEH = 0xc80;
-    static constexpr Half CSR_TIMEH = 0xc81;
-    static constexpr Half CSR_INSTRETH = 0xc82;
-    static constexpr Half CSR_HPMCOUNTERH = 0xc84;
-
     static constexpr Half CSR_SSTATUS = 0x100;
     static constexpr Half CSR_SIE = 0x104;
     static constexpr Half CSR_STVEC = 0x105;
@@ -114,7 +109,6 @@ public:
     static constexpr Half CSR_MIE = 0x304;
     static constexpr Half CSR_MTVEC = 0x305;
     static constexpr Half CSR_MCOUNTEREN = 0x306;
-    static constexpr Half CSR_MSTATUSH = 0x310;
     static constexpr Half CSR_MSCRATCH = 0x340;
     static constexpr Half CSR_MEPC = 0x341;
     static constexpr Half CSR_MCAUSE = 0x342;
@@ -123,9 +117,7 @@ public:
     static constexpr Half CSR_MTINST = 0x34a;
     static constexpr Half CSR_MTVAL2 = 0x34b;
     static constexpr Half CSR_MENVCFG = 0x30a;
-    static constexpr Half CSR_MENVCFGH = 0x31a;
     static constexpr Half CSR_MSECCFG = 0x747;
-    static constexpr Half CSR_MSECCFGH = 0x757;
     
     static constexpr Half CSR_PMPCFG_MAX = 16;
     static constexpr Half CSR_PMPCFG0 = 0x3a0;
@@ -137,8 +129,6 @@ public:
     static constexpr Half CSR_MINSTRET = 0xb02;
     static constexpr Half CSR_MHPMCOUNTER3 = 0xb03;
     static constexpr Half CSR_MCYCLEH = 0xb80;
-    static constexpr Half CSR_MINSTRETH = 0xb82;
-    static constexpr Half CSR_MHPMCOUNTER3H = 0xb83;
     static constexpr Half CSR_MCOUNTINHIBIT = 0x320;
 
     static constexpr Half CSR_PERFORMANCE_EVENT_MAX = 32;

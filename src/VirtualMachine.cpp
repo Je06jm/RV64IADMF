@@ -38,9 +38,6 @@ Long VirtualMachine::ReadCSR(Long csr, bool is_internal_read) {
     
     if (csr >= CSR_MHPMCOUNTER3 && csr < (CSR_MHPMCOUNTER3 + CSR_PERF_COUNTER_MAX - 3))
         return 0;
-    
-    if (csr >= CSR_MHPMCOUNTER3H && csr < (CSR_MHPMCOUNTER3H + CSR_PERF_COUNTER_MAX - 3))
-        return 0;
 
     switch (csr) {
         case CSR_MCYCLE:
@@ -78,7 +75,6 @@ Long VirtualMachine::ReadCSR(Long csr, bool is_internal_read) {
             return 0;
         
         case CSR_MENVCFG:
-        case CSR_MENVCFGH:
             return 0;
         
         case CSR_SENVCFG:
@@ -112,13 +108,11 @@ void VirtualMachine::WriteCSR(Long csr, Long value) {
         case CSR_MHARTID:
         case CSR_MISA:
         case CSR_MINSTRET:
-        case CSR_MINSTRETH:
         case CSR_CYCLE:
         case CSR_TIME:
         case CSR_MCOUNTEREN:
         case CSR_MCOUNTINHIBIT:
         case CSR_MENVCFG:
-        case CSR_MENVCFGH:
         case CSR_SENVCFG:
             return; // Non writable
         
@@ -513,9 +507,6 @@ void VirtualMachine::Setup() {
     csrs[CSR_CYCLE] = 0;
     csrs[CSR_TIME] = 0;
     csrs[CSR_INSTRET] = 0;
-    csrs[CSR_CYCLEH] = 0;
-    csrs[CSR_TIMEH] = 0;
-    csrs[CSR_INSTRETH] = 0;
 
     // Supervisor
 
