@@ -23,9 +23,9 @@ APP_FLAGS = -Isrc
 
 CXX_HEADERS = $(wildcard src/*.hpp)
 
-LIBRARY = rv32adfima.a
+LIBRARY = rv64adfima.a
 
-PROGRAM = RV32ADFIMA.exe
+PROGRAM = RV64ADFIMA.exe
 
 BIOS_LD = ld.lld
 BIOS_LD_FLAGS = -T bios/linker.ld
@@ -80,20 +80,22 @@ debug_library: $(CXX_OBJS) $(CXX_HEADERS)
 	$(AR) $(AR_FLAGS) $(LIBRARY) $(CXX_OBJS)
 
 all: CXX_FLAGS += $(APP_FLAGS)
-all: library $(APP_OBJS)  $(APP_CC_OBJS)
+all: library
+all: CXX_FLAGS += -O3
+all: $(APP_OBJS)  $(APP_CC_OBJS)
 	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(APP_CC_OBJS) $(LD_FLAGS) -O3
 
 debug: CXX_FLAGS += $(APP_FLAGS)
 debug: debug_library
 debug: CXX_FLAGS += -g
 debug: $(APP_OBJS) $(APP_CC_OBJS)
-	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(APP_CC_OBJS) $(LD_FLAGS) -O2
+	$(LD) -o $(PROGRAM) $(APP_OBJS) $(CXX_OBJS) $(APP_CC_OBJS) $(LD_FLAGS) -O3
 
 bios: $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS) $(BIOS_CC_HEADERS)
 	$(BIOS_LD) $(BIOS_LD_FLAGS) -o $(BIOS).elf $(BIOS_CC_OBJS) $(BIOS_ASM_OBJS)
 	$(BIOS_OBJ_COPY) $(BIOS_OBJ_COPY_FLAGS) $(BIOS).elf $(BIOS).bin
 
-test: TEST_CXX_FLAGS += -O2
+test: TEST_CXX_FLAGS += -O3
 test: library $(TEST_CXX_OBJS)
 	$(LD) -o $(TEST_PROGRAM) $(TEST_CXX_OBJS) $(LIBRARY) -O3
 
