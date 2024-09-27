@@ -1628,7 +1628,6 @@ bool VirtualMachine::Step(Long steps) {
                     val = lhs % rhs;
                 
                 val &= 0xffffffff;
-                val = SignExtendUnsigned(val, 31);
 
                 regs[instr.rd].u64 = val;
                 break;
