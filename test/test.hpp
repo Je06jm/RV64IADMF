@@ -135,6 +135,7 @@ inline Word RV64_J(Word opcode, Word rd, Word imm) {
 
 size_t RandomInt();
 
+// Generates a random number of Type from [min, max]
 template <typename Type>
 inline Type Random(Type min, Type max) {
     if constexpr (std::is_floating_point_v<Type>) {
