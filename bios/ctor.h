@@ -1,6 +1,8 @@
 #ifndef CTOR_H
 #define CTOR_H
 
+#include <stdbool.h>
+
 int ctor_init();
 void ctor_cleanup();
 

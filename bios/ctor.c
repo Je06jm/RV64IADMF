@@ -1,13 +1,15 @@
 #include "ctor.h"
 
+#include "machine.h"
+
 int ctor_init() {
     if (!ctor_setup_stdlib())
-        return 0;
+        return false;
     
     if (!ctor_setup_stdio())
-        return 0;
+        return false;
     
-    return 1;
+    return true;
 }
 
 void ctor_cleanup() {

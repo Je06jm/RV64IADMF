@@ -1,11 +1,12 @@
 .section .bootstrap, "aw"
 
 .globl _start
-.extern putc
+.extern ctor_init
 .extern main
-.extern printf
+.extern exit
 
 _start:
+    ebreak
     la sp, stack_top
 
     la t0, data
@@ -20,22 +21,21 @@ _start:
     sw t1, 0(t3)
     sw t2, 4(t3)
 
-    ebreak
+    call ctor_init
+    la t0, 0
+    beq a0, t0, .failure
+
     li a0, 2
     la a1, argv
     call main
+    j .exit
 
-    addi sp, sp, -4
-    sw a0, (sp)
-
-    //li a0, 0
-    //call putc
-
-    lw a1, (sp)
-    add sp, sp, 4
-
+.failure:
     li a0, -1
-    ecall
+
+.exit:
+    call exit
+
 
 .text
 
