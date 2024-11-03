@@ -36,6 +36,23 @@ public:
         SLong s64;
     };
 
+    struct VMException : public std::exception {
+        Hart hart_id;
+        std::array<Reg, REGISTER_COUNT> regs;
+        std::array<Float, REGISTER_COUNT> fregs;
+        std::unordered_map<Long, Long> csrs;
+        Long virtual_pc;
+        std::pair<Long, bool> physical_pc;
+        std::pair<Word, bool> instruction;
+        std::string original_exception;
+
+        std::string dump() const;
+
+        inline const char* what() {
+            return original_exception.c_str();
+        }
+    };
+
 private:
     static constexpr Byte MACHINE_MODE = 0b11;
     static constexpr Byte SUPERVISOR_MODE = 0b01;
@@ -521,6 +538,10 @@ public:
     inline void SetPauseOnRestart(bool pause_on_restart) { this->pause_on_restart = pause_on_restart; }
     inline bool PauseOnRestart() const { return pause_on_restart; }
 
+private:
+    bool SingleStep();
+
+public:
     bool Step(Long steps = 1000);
     void Run();
 
