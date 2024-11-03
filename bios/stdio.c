@@ -36,7 +36,7 @@ size_t std_stdin_read(FILE* file, size_t count, void* buffer) {
     return 0;
 }
 
-size_t std_stdout_write(FILE* file, size_t count, void* buffer) {
+size_t std_stdout_write(FILE* file, size_t count, const void* buffer) {
     stdout_data* data = (stdout_data*)file->data;
 
     const char* str = (const char*)buffer;
@@ -54,13 +54,14 @@ size_t std_stdout_write(FILE* file, size_t count, void* buffer) {
     return count;
 }
 
-size_t std_stderr_write(FILE* file, size_t count, void* buffer) {
+size_t std_stderr_write(FILE* file, size_t count, const void* buffer) {
     const char* str = (const char*)buffer;
+    machine_break();
     machine_call(MACHINE_CALL_COUT, str, count);
     return count;
 }
 
-size_t std_stdin_write(FILE* file, size_t count, void* buffer) {
+size_t std_stdin_write(FILE* file, size_t count, const void* buffer) {
     fprintf(stderr, "Cannot write to stdin\n");
     return 0;
 }
@@ -72,6 +73,7 @@ int std_io_file_flush(FILE* file) {
 
 int std_stdout_flush(FILE* file) {
     stdout_data* data = (stdout_data*)file->data;
+    machine_break();
     machine_call(MACHINE_CALL_COUT, (const char*)data->buffer, data->index);
     data->index = 0;
     return 0;
@@ -101,7 +103,7 @@ int ctor_setup_stdio(void) {
     _stderr_impl.flush = std_io_file_flush;
     _stderr_impl.data = NULL;
 
-    return 1;
+    return true;
 }
 
 void ctor_cleanup_stdio(void) {
@@ -120,6 +122,14 @@ int fprintf(FILE* file, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
     int chars = vfprintf(file, fmt, args);
+    va_end(args);
+    return chars;
+}
+
+int snprintf(char* buffer, size_t bufsize, const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    int chars = vsnprintf(buffer, bufsize, fmt, args);
     va_end(args);
     return chars;
 }
@@ -163,7 +173,7 @@ int s_str_writer(void* obj, const char* str, size_t size) {
 int vsnprintf(char* buffer, size_t bufsize, const char* fmt, va_list args) {
     s_str_data data;
     data.buffer = buffer;
-    data.buffer = bufsize;
+    data.bufsize = bufsize;
     data.written = 0;
 
     return str_formatter(s_str_writer, &data, fmt, args);
@@ -198,7 +208,7 @@ int num_formatter(str_writer writer, void* obj, uint64_t num, uint32_t base, boo
 
     char str[64];
     int j;
-    for (j = 0; i; j++, i)
+    for (j = 0; i; j++, j++)
         str[j] = buffer[--i];
     str[j] = '\0';
 
@@ -220,12 +230,13 @@ int str_formatter(str_writer writer, void* obj, const char* fmt, va_list args) {
 
             switch (c) {
                 case 'u': {
-                    uint64_t num = va_arg(args, uint64_t);
+
+                    uint32_t num = va_arg(args, uint32_t);
                     chars += num_formatter(writer, obj, num, 10, false, false);
                     break;
                 }
                 case 'i': {
-                    int64_t num = va_arg(args, int64_t);
+                    int32_t num = va_arg(args, int32_t);
                     chars += num_formatter(writer, obj, *(uint32_t*)&num, 10, true, false);
                     break;
                 }
@@ -273,6 +284,39 @@ int str_formatter(str_writer writer, void* obj, const char* fmt, va_list args) {
                 }
                 case '%': {
                     chars += writer(obj, "%", 1);
+                    break;
+                }
+                case 'l': {
+                    c = *fmt;
+                    fmt++;
+
+                    switch (c) {
+                        case 'l': {
+                            c = *fmt;
+                            fmt++;
+
+                            switch (c) {
+                                case 'u': {
+                                    uint64_t num = va_arg(args, uint64_t);
+                                    chars += num_formatter(writer, obj, num, 10, false, false);
+                                    break;
+                                }
+                                default:{
+                                    fmt--;
+                                    int64_t num = va_arg(args, int64_t);
+                                    chars += num_formatter(writer, obj, num, 10, true, false);
+                                    break;
+                                }
+                            }
+                            break;
+                        }
+                        default: {
+                            fmt--; 
+                            int32_t num = va_arg(args, int32_t);
+                            chars += num_formatter(writer, obj, *(uint64_t*)&num, 10, true, false);
+                            break;
+                        }
+                    }
                     break;
                 }
                 default: {

@@ -2,13 +2,14 @@
 #define STDIO_H
 
 #include <stddef.h>
+#include <stdarg.h>
 
 typedef struct FILE {
-    void (*open)(FILE* file, const char* path, const char* mode);
-    void (*close)(FILE* file);
-    size_t (*read)(FILE* file, size_t count, void* buffer);
-    size_t (*write)(FILE* file, size_t count, void* buffer);
-    int (*flush)(FILE* file);
+    void (*open)(struct FILE* file, const char* path, const char* mode);
+    void (*close)(struct FILE* file);
+    size_t (*read)(struct FILE* file, size_t count, void* buffer);
+    size_t (*write)(struct FILE* file, size_t count, const void* buffer);
+    int (*flush)(struct FILE* file);
 
     void* data;
 } FILE;
