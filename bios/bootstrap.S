@@ -20,6 +20,7 @@ _start:
     sw t1, 0(t3)
     sw t2, 4(t3)
 
+    ebreak
     li a0, 2
     la a1, argv
     call main
@@ -56,8 +57,8 @@ argv_0: .string "            "
 .align 4
 argv_1: .string "bios.elf"
 
-.align 4
-argv: .word argv_0, argv_1, 0
+.align 8
+argv: .dword argv_0, argv_1, 0
 
 data: .word 0x82345678, 0x9abcdef0
 

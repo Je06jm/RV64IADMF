@@ -1,4 +1,4 @@
-OUTPUT_FORMAT("elf32-littleriscv", "elf32-littleriscv", "elf32-littleriscv")
+OUTPUT_FORMAT("elf64-littleriscv", "elf64-littleriscv", "elf64-littleriscv")
 OUTPUT_ARCH(riscv)
 
 ENTRY(_start)
@@ -10,12 +10,12 @@ MEMORY
 
 SECTIONS
 {
-    img_begin = .;
+    img_begin = 0x1000;
 
     .bootstrap :
     {
         *(.bootstrap)
-    }
+    } > ram
     
     .text :
     {
