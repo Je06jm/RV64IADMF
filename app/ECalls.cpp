@@ -9,6 +9,7 @@
 #include <string>
 #include <format>
 #include <cstdlib>
+#include <cstring>
 
 using VM = VirtualMachine;
 using Regs = std::array<VM::Reg, VM::REGISTER_COUNT>;
@@ -25,14 +26,10 @@ void ECallCOut(Hart, bool is_32_bit_mode, Memory& memory, Regs& regs, FRegs&) {
     if (is_32_bit_mode) size = regs[VM::REG_A2].u32;
     else size = regs[VM::REG_A2].u64;
 
-    std::vector<Byte> buffer_str;
-    buffer_str.resize(size, 0);
-    memory.PeekWords
-
     for (Address i = 0; i < size; addr++, i++) {
-        auto [valid, byte] = memory.ReadByte
         Byte byte = memory.ReadByte(addr);
-        str += static_cast<char>(byte);
+        if (std::isprint(byte) || std::isspace(byte))
+            str += static_cast<char>(byte);
     }
 
     std::cout << str << std::flush;
