@@ -51,7 +51,6 @@ void GUICSR::Draw() {
         CSRTuple(VM::CSR_MSECCFG, "mseccfg"),
         CSRTuple(VM::CSR_MCYCLE, "mcycle"),
         CSRTuple(VM::CSR_MINSTRET, "minstret"),
-        CSRTuple(VM::CSR_MCYCLEH, "mcycleh"),
     };
 
     if (ImGui::Begin("CSRs")) {
