@@ -14,20 +14,21 @@
 
 class MemoryRegion {
 public:
-    const Word type;
-    const Word flags;
+    const Long type;
+    const Long flags;
     const Address base, size;
     const bool readable, writable;
 
-    static constexpr Word TYPE_UNKNOWN = -1U;
-    static constexpr Word TYPE_UNUSED = 0;
-    static constexpr Word TYPE_PMA_ROM = 1;
-    static constexpr Word TYPE_MAPPED_CSRS = 2;
-    static constexpr Word TYPE_BIOS_ROM = 4;
-    static constexpr Word TYPE_GENERAL_RAM = 5;
-    static constexpr Word TYPE_FRAMEBUFFER = 8;
+    static constexpr Long TYPE_UNKNOWN = -1UL;;
+    static constexpr Long TYPE_UNUSED = 0;
+    static constexpr Long TYPE_PMA_ROM = 1;
+    static constexpr Long TYPE_MAPPED_CSRS = 2;
+    static constexpr Long TYPE_BIOS_ROM = 4;
+    static constexpr Long TYPE_GENERAL_RAM = 5;
+    static constexpr Long TYPE_SIMPLE_DEVICE_CONTROLLER = 6;
+    static constexpr Long TYPE_FRAMEBUFFER = 8;
 
-    MemoryRegion(Word type, Word flags, Address base, Address size, bool readable, bool writable) : type{type}, flags{flags}, base{base}, size{size}, readable{readable}, writable{writable} {}
+    MemoryRegion(Long type, Long flags, Address base, Address size, bool readable, bool writable) : type{type}, flags{flags}, base{base}, size{size}, readable{readable}, writable{writable} {}
     virtual ~MemoryRegion() = default;
 
     virtual Long ReadLong(Address) const { return 0; }
@@ -146,7 +147,7 @@ private:
                     return region->size;
                 
                 case 3: {
-                    Word flags = 0;
+                    Long flags = 0;
 
                     if (region->readable) flags |= (1<<0);
                     if (region->writable) flags |= (1<<1);
